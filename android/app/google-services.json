@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "474232622849",
+    "project_id": "hipster-machine-test",
+    "storage_bucket": "hipster-machine-test.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:474232622849:android:5fe66a4fafe0e2d6e51500",
+        "android_client_info": {
+          "package_name": "com.example.hipster_interview"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDJOb5hxt3oP4m9Xd2oDvY5uqbzp6IHaq0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:474232622849:android:7d400519a312647fe51500",
+        "android_client_info": {
+          "package_name": "com.example.hipster_machine_test"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDJOb5hxt3oP4m9Xd2oDvY5uqbzp6IHaq0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
