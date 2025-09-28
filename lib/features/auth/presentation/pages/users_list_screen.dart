@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:hipster_machine_test/core/utils/functions.dart';
+import 'package:hipster_machine_test/features/auth/presentation/pages/video_call_screen.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/constants/colors.dart';
+import '../../../../core/utils/call_service.dart';
 import '../../widgets/logout_alert.dart';
 import '../providers/login_provider.dart';
 import '../providers/users_list_provider.dart';
@@ -43,7 +45,8 @@ class UsersListScreen extends StatelessWidget {
           ),
         ],
       ),
-      body: FutureBuilder(
+      body:
+      FutureBuilder(
         future: provider.fetchUsers(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting &&
@@ -55,6 +58,7 @@ class UsersListScreen extends StatelessWidget {
           }
 
           if (snapshot.hasError) {
+            print(snapshot.error.toString()+' KRJFKJRF ');
             return Center(
               child: Text(
                 'Error: ${snapshot.error}',
@@ -88,7 +92,8 @@ class UsersListScreen extends StatelessWidget {
                     // Optional: Add a subtle border
                     side: BorderSide(color: accentColor.withOpacity(0.4), width: 1),
                   ),
-                  child: ListTile(
+                  child:
+                  ListTile(
                     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
 
                     leading: Container(
@@ -96,23 +101,31 @@ class UsersListScreen extends StatelessWidget {
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: accentColor, // Vibrant border for the avatar
+                          color: accentColor, // Vibrant border for the avatar placeholder
                           width: 2,
                         ),
                       ),
                       child: CircleAvatar(
                         radius: 24,
-                        backgroundImage: NetworkImage(user.avatar),
-                        backgroundColor: clLightSkyGray, // Fallback background
+                        // Since JSONPlaceholder users don't have avatars, use initials as fallback
+                        backgroundColor: clLightSkyGray,
+                        child: Text(
+                          user.name.isNotEmpty ? user.name[0] : '', // First letter of the name
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                            color: accentColor,
+                          ),
+                        ),
                       ),
                     ),
 
                     title: Text(
-                      user.fullName,
+                      user.name,
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 18,
-                        color: clCleanWhite, // 3. White Text for Contrast
+                        color: clCleanWhite, // White text for contrast
                       ),
                     ),
 
@@ -125,17 +138,29 @@ class UsersListScreen extends StatelessWidget {
                     ),
 
                     trailing: const Icon(
-                      Icons.videocam_outlined, // Changed to a video icon for context
+                      Icons.videocam_outlined, // Video icon for context
                       size: 24,
-                      color: accentColor, // Vibrant color for action icon
+                      color: accentColor, // Vibrant color
                     ),
+
                     onTap: () {
+                      SignalingService? _signalingService;
+                      callNext(
+                        UserCallScreen(
+                          loginUserId: "12345", // required user ID
+                          autoAccept: true, // bool, not string
+                          callId: "abc123", // optional, can also be null
+                          signalingService: _signalingService, // pass your SignalingService instance
+                        ),
+                        context,
+                      );
                       // TODO: Implement navigation to the video call screen
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Starting call with ${user.fullName}')),
+                        SnackBar(content: Text('Starting call with ${user.name}')),
                       );
                     },
-                  ),
+                  )
+,
                 ),
               );
             },

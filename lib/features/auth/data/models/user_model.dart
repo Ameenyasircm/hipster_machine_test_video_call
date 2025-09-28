@@ -1,41 +1,38 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class UserModel {
   final int id;
+  final String name;
+  final String username;
   final String email;
-  final String firstName;
-  final String lastName;
-  final String avatar;
+  // You can add other fields like address, phone, company if needed
 
   UserModel({
     required this.id,
+    required this.name,
+    required this.username,
     required this.email,
-    required this.firstName,
-    required this.lastName,
-    required this.avatar,
   });
-
-  // ✅ Full name getter
-  String get fullName => "$firstName $lastName";
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
     return UserModel(
       id: json['id'],
+      name: json['name'],
+      username: json['username'],
       email: json['email'],
-      firstName: json['first_name'],
-      lastName: json['last_name'],
-      avatar: json['avatar'],
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
       "id": id,
+      "name": name,
+      "username": username,
       "email": email,
-      "first_name": firstName,
-      "last_name": lastName,
-      "avatar": avatar,
     };
   }
 }
+
 
 
 class Address {
@@ -119,5 +116,85 @@ class Company {
       "catchPhrase": catchPhrase,
       "bs": bs,
     };
+  }
+}
+
+class Booking {
+  final String id;
+  final String userId;
+  final String conferenceId;
+  final DateTime bookedAt;
+  final DateTime endAt;
+  final bool isCalled;
+  final String name; // Non-required
+  final int tokenNumber;
+  final String bookingDescription;
+  final String bookedUserFCM;
+  final String phone; // Non-required
+  final String address; // Non-required
+  final String pinCode; // Non-required
+  final String aadharNumber; // Non-required
+  final String panchayat; // Non-required
+  final String ward; // Non-required
+
+  Booking({
+    required this.id,
+    required this.userId,
+    required this.conferenceId,
+    required this.bookedAt,
+    required this.endAt,
+    this.isCalled = false,
+    this.name = '', // Default to empty string
+    required this.tokenNumber,
+    required this.bookingDescription,
+    required this.bookedUserFCM,
+    this.phone = '', // Default to empty string
+    this.address = '', // Default to empty string
+    this.pinCode = '', // Default to empty string
+    this.aadharNumber = '', // Default to empty string
+    this.panchayat = '', // Default to empty string
+    this.ward = '', // Default to empty string
+  });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'userId': userId,
+      'conferenceId': conferenceId,
+      'bookedAt': Timestamp.fromDate(bookedAt),
+      'endAt': Timestamp.fromDate(endAt),
+      'isCalled': isCalled,
+      'name': name,
+      'tokenNumber': tokenNumber,
+      'bookingDescription': bookingDescription,
+      'bookedUserFCM': bookedUserFCM,
+      'phone': phone,
+      'address': address,
+      'pinCode': pinCode,
+      'aadharNumber': aadharNumber,
+      'panchayat': panchayat,
+      'ward': ward,
+    };
+  }
+
+  factory Booking.fromMap(Map<String, dynamic> map, String id) {
+    return Booking(
+      id: id,
+      userId: map['userId'] ?? '',
+      conferenceId: map['conferenceId'] ?? '',
+      bookedAt: (map['bookedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      endAt: (map['endAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      isCalled: map['isCalled'] ?? false,
+      name: map['name'] ?? '',
+      tokenNumber: map['tokenNumber'] ?? 0,
+      bookingDescription: map['bookingDescription'] ?? '',
+      bookedUserFCM: map['bookedUserFCM'] ?? '',
+      phone: map['phone'] ?? '',
+      address: map['address'] ?? '',
+      pinCode: map['pinCode'] ?? '',
+      aadharNumber: map['aadharNumber'] ?? '',
+      panchayat: map['panchayat'] ?? '',
+      ward: map['ward'] ?? '',
+    );
   }
 }

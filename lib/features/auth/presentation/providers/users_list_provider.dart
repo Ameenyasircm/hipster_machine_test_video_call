@@ -11,21 +11,23 @@ class UserListProvider extends ChangeNotifier {
 
   Future<void> fetchUsers() async {
     final response = await http.get(
-      Uri.parse('https://reqres.in/api/users?page=1'),
+      Uri.parse('https://jsonplaceholder.typicode.com/users'),
+      headers: {
+        "Accept": "application/json",
+      },
     );
 
+    print('${response.statusCode}');
+
     if (response.statusCode == 200) {
-      log(response.body);
+      final List<dynamic> jsonList = json.decode(response.body);
 
-      final Map<String, dynamic> jsonMap = json.decode(response.body);
-      final List<dynamic> jsonList = jsonMap['data'];
-
-      // Map JSON to UserModel and assign to usersList
       usersList = jsonList.map((e) => UserModel.fromJson(e)).toList();
 
-      notifyListeners(); // if using Provider to update UI
+      notifyListeners();
     } else {
-      throw Exception('Failed to load users');
+      print("Response body: ${response.body}");
+      throw Exception('Failed to load users - ${response.statusCode}');
     }
   }
 

@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import 'features/auth/presentation/pages/login_screen.dart';
 import 'features/auth/presentation/pages/registration_screen.dart';
 import 'features/auth/presentation/pages/users_list_screen.dart';
+import 'features/auth/presentation/providers/notification_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -25,6 +26,7 @@ class MyApp extends StatelessWidget {
         providers: [
         ChangeNotifierProvider(create: (context) => LoginProvider(),),
         ChangeNotifierProvider(create: (context) => UserListProvider(),),
+        ChangeNotifierProvider(create: (context) => NotificationProvider(),),
         ],
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
