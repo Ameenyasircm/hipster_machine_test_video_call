@@ -25,7 +25,8 @@ class UsersListScreen extends StatelessWidget {
           ),
         ],
       ),
-      body: FutureBuilder(
+      body:
+      FutureBuilder(
         future: provider.fetchUsers(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting &&
@@ -49,26 +50,23 @@ class UsersListScreen extends StatelessWidget {
               final user = provider.usersList[index];
               return ListTile(
                 leading: CircleAvatar(
-                  backgroundColor: clDeepBlue,
-                  child: Text(
-                    user.name.isNotEmpty ? user.name[0] : "?",
-                    style: const TextStyle(color: Colors.white),
-                  ),
+                  backgroundImage: NetworkImage(user.avatar), // ✅ avatar from API
                 ),
                 title: Text(
-                  user.name,
+                  user.fullName, // ✅ uses getter → "$firstName $lastName"
                   style: const TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 16,
                   ),
                 ),
                 subtitle: Text(user.email),
-                trailing: Text(user.companyName),
+                trailing: const Icon(Icons.arrow_forward_ios, size: 16), // optional
               );
             },
           );
         },
-      ),
+      )
+,
     );
   }
 }

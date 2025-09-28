@@ -1,53 +1,42 @@
 class UserModel {
   final int id;
-  final String name;
-  final String username;
   final String email;
-  final Address address;
-  final String phone;
-  final String website;
-  final Company company;
+  final String firstName;
+  final String lastName;
+  final String avatar;
 
   UserModel({
     required this.id,
-    required this.name,
-    required this.username,
     required this.email,
-    required this.address,
-    required this.phone,
-    required this.website,
-    required this.company,
+    required this.firstName,
+    required this.lastName,
+    required this.avatar,
   });
 
-  // ✅ Add this getter
-  String get companyName => company.name;
+  // ✅ Full name getter
+  String get fullName => "$firstName $lastName";
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
     return UserModel(
       id: json['id'],
-      name: json['name'],
-      username: json['username'],
       email: json['email'],
-      address: Address.fromJson(json['address']),
-      phone: json['phone'],
-      website: json['website'],
-      company: Company.fromJson(json['company']),
+      firstName: json['first_name'],
+      lastName: json['last_name'],
+      avatar: json['avatar'],
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
       "id": id,
-      "name": name,
-      "username": username,
       "email": email,
-      "address": address.toJson(),
-      "phone": phone,
-      "website": website,
-      "company": company.toJson(),
+      "first_name": firstName,
+      "last_name": lastName,
+      "avatar": avatar,
     };
   }
 }
+
 
 class Address {
   final String street;

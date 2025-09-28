@@ -22,15 +22,15 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-
     Timer(const Duration(seconds: 3), () {
-     callNextReplacement(LoginScreen(), context);
+      checkLoginStatus();
+
     });
   }
   Future<void> checkLoginStatus() async {
     final prefs = await SharedPreferences.getInstance();
     final isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
-
+      print(isLoggedIn.toString()+' FRNRJKNRF ');
     // Wait for splash duration
     await Future.delayed(const Duration(seconds: 3));
 
