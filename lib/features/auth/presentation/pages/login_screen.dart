@@ -184,18 +184,18 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 20),
 
                 // 6. Forgot Password and Sign Up Links
-                Align(
-                  alignment: Alignment.center,
-                  child: TextButton(
-                    onPressed: () {
-                      // Handle Forgot Password navigation
-                    },
-                    child: const Text(
-                      'Forgot Password?',
-                      style: TextStyle(color: clLightSkyGray, fontSize: 14),
-                    ),
-                  ),
-                ),
+                // Align(
+                //   alignment: Alignment.center,
+                //   child: TextButton(
+                //     onPressed: () {
+                //       // Handle Forgot Password navigation
+                //     },
+                //     child: const Text(
+                //       'Forgot Password?',
+                //       style: TextStyle(color: clLightSkyGray, fontSize: 14),
+                //     ),
+                //   ),
+                // ),
 
                 const SizedBox(height: 4),
 
