@@ -3,7 +3,7 @@ import 'package:hipster_machine_test/core/utils/functions.dart';
 import 'package:hipster_machine_test/features/auth/presentation/pages/registration_screen.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/constants/colors.dart';
-import '../providers/login_provider.dart'; // adjust path
+import '../providers/login_provider.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -40,32 +40,69 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     final provider = Provider.of<LoginProvider>(context);
 
+    // Define the colors for the gradient button
+    const Color gradientStart = Color(0xFF00C6FF); // A bright teal/azure
+    const Color gradientEnd = Color(0xFF8042F0);  // A deep purple
+
     return Scaffold(
-      backgroundColor: clLightSkyGray,
-      appBar: AppBar(
-        title: const Text('Machine Test Login'),
-        backgroundColor: clDeepBlue,
-        foregroundColor: clCleanWhite,
-      ),
+      // 1. Dark background color from your splash screen
+      backgroundColor: clDeepBlue,
       body: Center(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(32.0),
+          padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 48.0),
           child: Form(
             key: _formKey,
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
-                Icon(Icons.lock_open, size: 80, color: clDeepBlue),
-                const SizedBox(height: 48),
+                // 2. Butterfly Logo (Matching the splash screen style)
+                // Assuming 'assets/AppLogoPng.png' is the butterfly/app logo
+                Image.asset(
+                  'assets/AppLogoPng.png',
+                  height: 100, // Adjusted size
+                ),
 
-                // Email
+                const SizedBox(height: 24),
+
+                // "Welcome Back" Text
+                const Text(
+                  'Welcome Back',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: clCleanWhite,
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Log in to continue',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: clLightSkyGray, // Lighter text for secondary line
+                    fontSize: 16,
+                  ),
+                ),
+
+                const SizedBox(height: 40),
+
+                // 3. Email Input Field (Clean White Design)
                 TextFormField(
                   controller: _emailController,
+                  style: const TextStyle(color: clDeepBlue), // Text inside field is dark
                   decoration: InputDecoration(
-                    labelText: 'Email Address',
-                    prefixIcon: Icon(Icons.email, color: clVividAzure.withOpacity(0.7)),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    hintText: 'Email',
+                    hintStyle: TextStyle(color: clDeepBlue.withOpacity(0.6)),
+                    filled: true,
+                    fillColor: clCleanWhite, // White background
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide.none, // Remove border for clean look
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 16.0),
+                    // Use the vivid azure for icon color
+                    prefixIcon: Icon(Icons.email_outlined, color: gradientStart),
                   ),
                   keyboardType: TextInputType.emailAddress,
                   validator: (value) {
@@ -77,14 +114,25 @@ class _LoginScreenState extends State<LoginScreen> {
 
                 const SizedBox(height: 16),
 
-                // Password
+                // 4. Password Input Field (Clean White Design)
                 TextFormField(
                   controller: _passwordController,
                   obscureText: true,
+                  style: const TextStyle(color: clDeepBlue), // Text inside field is dark
                   decoration: InputDecoration(
-                    labelText: 'Password',
-                    prefixIcon: Icon(Icons.lock, color: clVividAzure.withOpacity(0.7)),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    hintText: 'Password',
+                    hintStyle: TextStyle(color: clDeepBlue.withOpacity(0.6)),
+                    filled: true,
+                    fillColor: clCleanWhite, // White background
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide.none, // Remove border for clean look
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 16.0),
+                    // Use the vivid azure for icon color
+                    prefixIcon: Icon(Icons.lock_outline, color: gradientStart),
+                    // Adding a trailing eye icon is common
+                    suffixIcon: Icon(Icons.remove_red_eye_outlined, color: clDeepBlue.withOpacity(0.4)),
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) return 'Please enter your password.';
@@ -95,29 +143,84 @@ class _LoginScreenState extends State<LoginScreen> {
 
                 const SizedBox(height: 32),
 
-                // Login button
-                ElevatedButton(
-                  onPressed: provider.isLoading ? null : () => _submitLogin(context),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: clVividAzure,
-                    foregroundColor: clCleanWhite,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                // 5. Gradient Login Button
+                Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(10),
+                    gradient: const LinearGradient(
+                      colors: [gradientStart, gradientEnd],
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                    ),
                   ),
-                  child: provider.isLoading
-                      ? const CircularProgressIndicator(color: Colors.white)
-                      : const Text('Login & Start Assessment',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: provider.isLoading ? null : () => _submitLogin(context),
+                      borderRadius: BorderRadius.circular(10),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        child: Center(
+                          child: provider.isLoading
+                              ? const SizedBox(
+                            height: 24,
+                            width: 24,
+                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3),
+                          )
+                              : const Text(
+                            'LOG IN',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: clCleanWhite,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
-                SizedBox(height: 20,),
-                InkWell(
-                  onTap: (){
-                    callNext(RegisterScreen(), context);
-                  },
-                  child: Align(
-                      alignment:Alignment.bottomCenter,
-                      child: Text('Register Now',style: TextStyle(color: Colors.blue,fontSize: 17),)),
-                )
+
+                const SizedBox(height: 20),
+
+                // 6. Forgot Password and Sign Up Links
+                Align(
+                  alignment: Alignment.center,
+                  child: TextButton(
+                    onPressed: () {
+                      // Handle Forgot Password navigation
+                    },
+                    child: const Text(
+                      'Forgot Password?',
+                      style: TextStyle(color: clLightSkyGray, fontSize: 14),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 4),
+
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text(
+                      "Don't have an account? ",
+                      style: TextStyle(color: clLightSkyGray, fontSize: 15),
+                    ),
+                    InkWell(
+                      onTap: () {
+                        callNext(const RegisterScreen(), context);
+                      },
+                      child: Text(
+                        'Sign Up',
+                        style: TextStyle(
+                          color: gradientStart, // Use a bright color for the link
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),

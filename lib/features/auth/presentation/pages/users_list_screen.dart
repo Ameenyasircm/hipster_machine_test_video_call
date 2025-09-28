@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:hipster_machine_test/core/utils/functions.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/constants/colors.dart';
+import '../../widgets/logout_alert.dart';
+import '../providers/login_provider.dart';
 import '../providers/users_list_provider.dart';
 
 class UsersListScreen extends StatelessWidget {
@@ -21,6 +24,12 @@ class UsersListScreen extends StatelessWidget {
             icon: const Icon(Icons.refresh),
             onPressed: () {
               provider.fetchUsers();
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: () {
+           showLogoutConfirmationDialog(context);
             },
           ),
         ],

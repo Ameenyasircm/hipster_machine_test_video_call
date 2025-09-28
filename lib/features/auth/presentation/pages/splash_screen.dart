@@ -73,7 +73,7 @@ class _SplashScreenState extends State<SplashScreen> {
               style: TextStyle(
                 // Set text color using the defined constant
                 color: clCleanWhite,
-                fontSize: 30,
+                fontSize: 15,
                 fontWeight: FontWeight.bold,
               ),
             ),
