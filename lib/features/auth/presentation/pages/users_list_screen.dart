@@ -13,69 +13,135 @@ class UsersListScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final provider = Provider.of<UserListProvider>(context);
 
+    // Define the vibrant color for accents
+    const Color accentColor = Color(0xFF00C6FF); // Bright gradient start color
+
     return Scaffold(
-      backgroundColor: clLightSkyGray,
+      // 1. Dark Background for the entire screen body
+      backgroundColor: clDeepBlue,
       appBar: AppBar(
-        title: const Text('Users'),
+        title: const Text('Users List'),
         backgroundColor: clDeepBlue,
         foregroundColor: clCleanWhite,
+        elevation: 0, // Remove shadow for flat look
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
+            // Use the accent color on the dark background
+            color: accentColor,
             onPressed: () {
               provider.fetchUsers();
             },
           ),
           IconButton(
             icon: const Icon(Icons.logout),
+            // Use the accent color on the dark background
+            color: accentColor,
             onPressed: () {
-           showLogoutConfirmationDialog(context);
+              showLogoutConfirmationDialog(context);
             },
           ),
         ],
       ),
-      body:
-      FutureBuilder(
+      body: FutureBuilder(
         future: provider.fetchUsers(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting &&
               provider.usersList.isEmpty) {
-            return const Center(child: CircularProgressIndicator());
+            return Center(
+              // Use a themed loading indicator
+              child: CircularProgressIndicator(color: accentColor),
+            );
           }
 
           if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
+            return Center(
+              child: Text(
+                'Error: ${snapshot.error}',
+                style: const TextStyle(color: Colors.redAccent),
+              ),
+            );
           }
 
           if (provider.usersList.isEmpty) {
-            return const Center(child: Text("No users found"));
+            return const Center(
+              child: Text(
+                "No users found",
+                style: TextStyle(color: clLightSkyGray),
+              ),
+            );
           }
 
-          return ListView.separated(
+          return ListView.builder(
             padding: const EdgeInsets.all(16),
             itemCount: provider.usersList.length,
-            separatorBuilder: (_, __) => const Divider(),
             itemBuilder: (context, index) {
               final user = provider.usersList[index];
-              return ListTile(
-                leading: CircleAvatar(
-                  backgroundImage: NetworkImage(user.avatar), // ✅ avatar from API
-                ),
-                title: Text(
-                  user.fullName, // ✅ uses getter → "$firstName $lastName"
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12.0),
+                child: Card(
+                  // 2. Card Design: Use a slightly lighter dark color for the card background
+                  color: clDeepBlue.withOpacity(0.85),
+                  elevation: 4, // Subtle elevation for floating effect
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    // Optional: Add a subtle border
+                    side: BorderSide(color: accentColor.withOpacity(0.4), width: 1),
+                  ),
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+
+                    leading: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: accentColor, // Vibrant border for the avatar
+                          width: 2,
+                        ),
+                      ),
+                      child: CircleAvatar(
+                        radius: 24,
+                        backgroundImage: NetworkImage(user.avatar),
+                        backgroundColor: clLightSkyGray, // Fallback background
+                      ),
+                    ),
+
+                    title: Text(
+                      user.fullName,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                        color: clCleanWhite, // 3. White Text for Contrast
+                      ),
+                    ),
+
+                    subtitle: Text(
+                      user.email,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: clLightSkyGray.withOpacity(0.8), // Lighter secondary text
+                      ),
+                    ),
+
+                    trailing: const Icon(
+                      Icons.videocam_outlined, // Changed to a video icon for context
+                      size: 24,
+                      color: accentColor, // Vibrant color for action icon
+                    ),
+                    onTap: () {
+                      // TODO: Implement navigation to the video call screen
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Starting call with ${user.fullName}')),
+                      );
+                    },
                   ),
                 ),
-                subtitle: Text(user.email),
-                trailing: const Icon(Icons.arrow_forward_ios, size: 16), // optional
               );
             },
           );
         },
-      )
-,
+      ),
     );
   }
 }
