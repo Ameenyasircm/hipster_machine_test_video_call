@@ -46,7 +46,7 @@ class UsersListScreen extends StatelessWidget {
             color: clLightSkyGray, // Subtler color for non-primary action
             onPressed: () {
               // Assuming showLogoutConfirmationDialog is implemented elsewhere
-              // showLogoutConfirmationDialog(context);
+              showLogoutConfirmationDialog(context);
             },
           ),
         ],
@@ -183,3 +183,18 @@ class UsersListScreen extends StatelessWidget {
     );
   }
 }
+
+// SignalingService? _signalingService;
+// callNext(
+// UserCallScreen(
+// loginUserId: "12345", // required user ID
+// autoAccept: true, // bool, not string
+// callId: "abc123", // optional, can also be null
+// signalingService: _signalingService, // pass your SignalingService instance
+// ),
+// context,
+// );
+// // TODO: Implement navigation to the video call screen
+// ScaffoldMessenger.of(context).showSnackBar(
+// SnackBar(content: Text('Starting call with ${user.name}')),
+// );

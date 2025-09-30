@@ -52,7 +52,12 @@
       return false;
     }
 
-    Future<bool> register(String email, String password) async {
+    Future<bool> register(
+        String name,
+        String phoneNumber,
+        String email,
+        String password,
+        ) async {
       _isLoading = true;
       _errorMessage = null;
       notifyListeners();
@@ -72,16 +77,18 @@
           return false;
         }
 
-        // Create new user
+        // Create new user with Name and Phone Number
         final newUser = {
+          "name": name,             // <-- ADDED NAME FIELD
+          "phoneNumber": phoneNumber, // <-- ADDED PHONE NUMBER FIELD
           "email": email,
-          "password": password, // ❌ plain text (for demo only)
+          "password": password, // ❌ plain text (for demo only) - Consider Firebase Auth or proper hashing
           "createdAt": FieldValue.serverTimestamp(),
         };
 
         final doc = await db.collection('USERS').add(newUser);
         _user = {...newUser, "id": doc.id};
-
+        saveLoginState(email);
         _isLoading = false;
         notifyListeners();
         return true;
@@ -93,7 +100,8 @@
       notifyListeners();
       return false;
     }
-    Future<void> saveLoginState(String email) async {
+
+      Future<void> saveLoginState(String email) async {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('isLoggedIn', true);
       await prefs.setString('userEmail', email);
