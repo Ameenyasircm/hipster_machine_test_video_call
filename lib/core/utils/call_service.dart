@@ -534,15 +534,15 @@ class SignalingService {
       onCallStatusChanged('ringing');
 
       // Send push notification
-      if (context.mounted) {
-        NotificationProvider provider = Provider.of<NotificationProvider>(context, listen: false);
-        await provider.sendPushNotification(
-          "You Have A Video Call",
-          "MP is calling you. Tap to answer.",
-          context,
-          receiverId.bookedUserFCM,
-        );
-      }
+      // if (context.mounted) {
+      //   NotificationProvider provider = Provider.of<NotificationProvider>(context, listen: false);
+      //   await provider.sendPushNotification(
+      //     "You Have A Video Call",
+      //     "MP is calling you. Tap to answer.",
+      //     context,
+      //     receiverId.bookedUserFCM,
+      //   );
+      // }
 
       // Set up no-answer timer (30 seconds)
       _startNoAnswerTimer();
