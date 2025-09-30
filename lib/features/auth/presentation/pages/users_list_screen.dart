@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
-import 'package:hipster_machine_test/core/utils/functions.dart';
-import 'package:hipster_machine_test/features/auth/presentation/pages/video_call_screen.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/constants/colors.dart';
-import '../../../../core/utils/call_service.dart';
+import '../../../../core/utils/user_view_alert.dart';
 import '../../widgets/logout_alert.dart';
-import '../providers/login_provider.dart';
 import '../providers/users_list_provider.dart';
+
+// Assuming clDeepBlue and clCleanWhite are defined in your colors.dart
+// Example definitions (if not provided):
+/*
+const Color clDeepBlue = Color(0xFF0A1828); // Deep, dark background
+const Color clCleanWhite = Color(0xFFF5F5F5); // Nearly white
+const Color clLightSkyGray = Color(0xFFA0B3C9); // Light gray for subtle text
+*/
 
 class UsersListScreen extends StatelessWidget {
   const UsersListScreen({Key? key}) : super(key: key);
@@ -15,152 +20,160 @@ class UsersListScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final provider = Provider.of<UserListProvider>(context);
 
-    // Define the vibrant color for accents
-    const Color accentColor = Color(0xFF00C6FF); // Bright gradient start color
+    // Define the vibrant color for accents (Butterfly theme gradient start)
+    const Color accentColor = Color(0xFF00C6FF); // Bright Cyan/Blue
+    // Define the secondary color for gradient/contrast
+    const Color secondaryAccent = Color(0xFF8A2BE2); // Blue-Violet
 
     return Scaffold(
       // 1. Dark Background for the entire screen body
       backgroundColor: clDeepBlue,
       appBar: AppBar(
-        title: const Text('Users List'),
+        title: const Text('Contacts', style: TextStyle(fontWeight: FontWeight.w600)),
         backgroundColor: clDeepBlue,
         foregroundColor: clCleanWhite,
         elevation: 0, // Remove shadow for flat look
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
-            // Use the accent color on the dark background
-            color: accentColor,
+            color: accentColor, // Use the primary accent color
             onPressed: () {
               provider.fetchUsers();
             },
           ),
           IconButton(
             icon: const Icon(Icons.logout),
-            // Use the accent color on the dark background
-            color: accentColor,
+            color: clLightSkyGray, // Subtler color for non-primary action
             onPressed: () {
-              showLogoutConfirmationDialog(context);
+              // Assuming showLogoutConfirmationDialog is implemented elsewhere
+              // showLogoutConfirmationDialog(context);
             },
           ),
         ],
       ),
-      body:
-      FutureBuilder(
+      body: FutureBuilder(
         future: provider.fetchUsers(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting &&
               provider.usersList.isEmpty) {
             return Center(
-              // Use a themed loading indicator
               child: CircularProgressIndicator(color: accentColor),
             );
           }
 
           if (snapshot.hasError) {
-            print(snapshot.error.toString()+' KRJFKJRF ');
             return Center(
               child: Text(
-                'Error: ${snapshot.error}',
+                'Error loading users',
                 style: const TextStyle(color: Colors.redAccent),
               ),
             );
           }
 
           if (provider.usersList.isEmpty) {
-            return const Center(
-              child: Text(
-                "No users found",
-                style: TextStyle(color: clLightSkyGray),
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.people_alt_outlined, size: 60, color: clLightSkyGray.withOpacity(0.5)),
+                  const SizedBox(height: 10),
+                  const Text(
+                    "No contacts found",
+                    style: TextStyle(color: clLightSkyGray, fontSize: 16),
+                  ),
+                ],
               ),
             );
           }
 
           return ListView.builder(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             itemCount: provider.usersList.length,
             itemBuilder: (context, index) {
               final user = provider.usersList[index];
               return Padding(
-                padding: const EdgeInsets.only(bottom: 12.0),
-                child: Card(
-                  // 2. Card Design: Use a slightly lighter dark color for the card background
-                  color: clDeepBlue.withOpacity(0.85),
-                  elevation: 4, // Subtle elevation for floating effect
-                  shape: RoundedRectangleBorder(
+                padding: const EdgeInsets.only(bottom: 10.0),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(12),
-                    // Optional: Add a subtle border
-                    side: BorderSide(color: accentColor.withOpacity(0.4), width: 1),
+                    // Use a subtle, dark gradient border for a modern look
+                    gradient: LinearGradient(
+                      colors: [
+                        accentColor.withOpacity(0.1),
+                        secondaryAccent.withOpacity(0.1),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.2),
+                        blurRadius: 8,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
-                  child:
-                  ListTile(
+                  child: ListTile(
                     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-
+                    // 2. Avatar with Gradient Border and Initials
                     leading: Container(
                       padding: const EdgeInsets.all(2),
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        border: Border.all(
-                          color: accentColor, // Vibrant border for the avatar placeholder
-                          width: 2,
+                        // Use a subtle gradient ring around the avatar
+                        gradient: LinearGradient(
+                          colors: [accentColor, secondaryAccent],
+                          begin: Alignment.topRight,
+                          end: Alignment.bottomLeft,
                         ),
                       ),
                       child: CircleAvatar(
                         radius: 24,
-                        // Since JSONPlaceholder users don't have avatars, use initials as fallback
-                        backgroundColor: clLightSkyGray,
+                        backgroundColor: clDeepBlue.withOpacity(0.9), // Darker center
                         child: Text(
-                          user.name.isNotEmpty ? user.name[0] : '', // First letter of the name
+                          user.name.isNotEmpty ? user.name[0] : '',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 18,
-                            color: accentColor,
+                            color: clCleanWhite, // White text for maximum contrast
                           ),
                         ),
                       ),
                     ),
 
+                    // 3. Title (User Name)
                     title: Text(
                       user.name,
                       style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18,
-                        color: clCleanWhite, // White text for contrast
+                        fontWeight: FontWeight.w600,
+                        fontSize: 17,
+                        color: clCleanWhite,
                       ),
                     ),
 
+                    // 4. Subtitle (User Email/Status)
                     subtitle: Text(
                       user.email,
                       style: TextStyle(
-                        fontSize: 14,
-                        color: clLightSkyGray.withOpacity(0.8), // Lighter secondary text
+                        fontSize: 13,
+                        color: clLightSkyGray.withOpacity(0.7),
                       ),
                     ),
 
-                    trailing: const Icon(
-                      Icons.videocam_outlined, // Video icon for context
-                      size: 24,
-                      color: accentColor, // Vibrant color
+                    // 5. Trailing Icon (No video call, now a simple 'view' icon)
+                    trailing: Icon(
+                      Icons.arrow_forward_ios_rounded, // Standard list navigation indicator
+                      size: 18,
+                      color: clLightSkyGray.withOpacity(0.6),
                     ),
 
+                    // 6. OnTap Action (Focus on navigation/profile view)
                     onTap: () {
-                      SignalingService? _signalingService;
-                      callNext(
-                        UserCallScreen(
-                          loginUserId: "12345", // required user ID
-                          autoAccept: true, // bool, not string
-                          callId: "abc123", // optional, can also be null
-                          signalingService: _signalingService, // pass your SignalingService instance
-                        ),
-                        context,
-                      );
-                      // TODO: Implement navigation to the video call screen
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Starting call with ${user.name}')),
-                      );
+                      // Navigate to User Profile/Details screen
+                      showUserDetailsDialog(context,user);
+                      // TODO: Implement navigation to a UserDetailsScreen
                     },
-                  )
-,
+                  ),
                 ),
               );
             },

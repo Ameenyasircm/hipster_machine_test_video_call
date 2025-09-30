@@ -5,13 +5,16 @@ class UserModel {
   final String name;
   final String username;
   final String email;
-  // You can add other fields like address, phone, company if needed
+  final String? phone;    // <--- ADDED: Must be nullable
+  final String? website;  // <--- ADDED: Must be nullable
 
   UserModel({
     required this.id,
     required this.name,
     required this.username,
     required this.email,
+    this.phone,   // <--- Updated constructor
+    this.website, // <--- Updated constructor
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
@@ -20,6 +23,10 @@ class UserModel {
       name: json['name'],
       username: json['username'],
       email: json['email'],
+      // Safely access nullable fields. If the key is missing or null, Dart's
+      // safe access operator (as String?) handles it correctly.
+      phone: json['phone'] as String?,
+      website: json['website'] as String?,
     );
   }
 
@@ -29,6 +36,8 @@ class UserModel {
       "name": name,
       "username": username,
       "email": email,
+      "phone": phone,
+      "website": website,
     };
   }
 }
