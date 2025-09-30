@@ -11,3 +11,4 @@ const clLightSkyGray = Color(0xFFF5F7FA);
 // Mock Colors (Ensure these are defined in your colors.dart)
 const Color accentColor = Color(0xFF00C6FF); // Bright Cyan/Blue
 const Color secondaryAccent = Color(0xFF8A2BE2); // Blue-Violet
+

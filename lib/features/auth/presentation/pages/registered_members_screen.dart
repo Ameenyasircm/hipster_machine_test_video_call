@@ -1,86 +1,108 @@
 // lib/features/users/screens/users_list_screen.dart
 
 import 'package:flutter/material.dart';
+import 'package:hipster_machine_test/features/auth/presentation/pages/video_call_screen.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/constants/colors.dart';
-import '../../../../core/utils/signaling_service.dart'; // Assuming this is needed elsewhere
-import '../providers/users_list_provider.dart'; // Import the new provider
-
-// Mock Colors (Ensure these are defined in your colors.dart)
-const Color clDeepBlue = Color(0xFF0F1828);
-const Color clCleanWhite = Color(0xFFF5F5F5);
-const Color clLightSkyGray = Color(0xFFA0B3C9);
-const Color accentColor = Color(0xFF00C6FF);
-const Color secondaryAccent = Color(0xFF8A2BE2);
-
+// ✅ FIXED: Use the same import as user_call_screen.dart
+import '../../../../core/utils/call_service.dart';
+import '../../../../core/utils/signaling_service.dart' hide SignalingService;
+import '../../data/models/user_model.dart';
+import '../providers/users_list_provider.dart';
 
 class RegisteredUsersScreen extends StatelessWidget {
+  final String currentLoginUserId = "user_1";
+
   const RegisteredUsersScreen({Key? key}) : super(key: key);
 
+// ... inside RegisteredUsersScreen ...
+
+  void _initiateCall(BuildContext context, AppUser targetUser) async {
+    const String currentLoginUserId = "user_1";
+
+    // 1. DO NOT create SignalingService here.
+    // 2. DO NOT start the call here.
+
+    // Navigate to call screen, passing the necessary data for it to start the call.
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        // NOTE: UserCallScreen MUST be updated to handle service creation internally
+        // and accept the target user info instead of a pre-created service.
+        builder: (context) => UserCallScreen(
+          loginUserId: currentLoginUserId,
+          // Pass the user the new screen should call
+          // targetUser: targetUser, // <--- New parameter
+          signalingService: null, // <--- Pass null or remove if service is created internally
+          autoAccept: false,
+        ),
+      ),
+    );
+
+    // Optional: Show a brief "Connecting..." snackbar
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Connecting to ${targetUser.name}...')),
+    );
+  }
+
+// ... rest of RegisteredUsersScreen remains the same ...
   @override
   Widget build(BuildContext context) {
+    // Listen to the provider for state changes
     final provider = Provider.of<UserListProvider>(context);
 
     return Scaffold(
       backgroundColor: clDeepBlue,
       appBar: AppBar(
-        title: const Text('Registered Users', style: TextStyle(fontWeight: FontWeight.w600)),
+        title: const Text('Registered Users', style: TextStyle(color: Colors.white)),
         backgroundColor: clDeepBlue,
-        foregroundColor: clCleanWhite,
-        elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            color: accentColor,
-            // 1. UPDATED FUNCTION NAME
-            onPressed: () => provider.fetchRegisteredUsers(),
-          ),
-        ],
       ),
       body: FutureBuilder(
-        // 2. UPDATED LIST NAME AND FUNCTION NAME
-        future: provider.registeredUsers.isEmpty ? provider.fetchRegisteredUsers() : null,
+        // Fetch users only if the list is empty AND we're not already loading.
+        // This logic ensures 'fetchRegisteredUsers' is called once on initial load.
+        future: provider.registeredUsers.isEmpty && !provider.isLoading
+            ? provider.fetchRegisteredUsers()
+            : null,
         builder: (context, snapshot) {
 
-          // 3. UPDATED LIST NAME
+          // --- FIX: The guaranteed return of a sized widget in all states ---
+
+          // 1. Loading State
           if (provider.isLoading && provider.registeredUsers.isEmpty) {
-            return Center(
+            return const Center(
               child: CircularProgressIndicator(color: accentColor),
             );
           }
 
+          // 2. Error State
           if (provider.errorMessage != null) {
             return Center(
-              child: Text(
-                'Error: ${provider.errorMessage}',
-                style: const TextStyle(color: Colors.redAccent),
+              child: Padding(
+                padding: const EdgeInsets.all(20.0),
+                child: Text(
+                  'Error loading users: ${provider.errorMessage}',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: clLightSkyGray, fontSize: 16),
+                ),
               ),
             );
           }
 
-          // 4. UPDATED LIST NAME
+          // 3. Empty State (after loading or if data is truly empty)
           if (provider.registeredUsers.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.people_alt_outlined, size: 60, color: clLightSkyGray.withOpacity(0.5)),
-                  const SizedBox(height: 10),
-                  const Text(
-                    "No users found. Try registering a new user.",
-                    style: TextStyle(color: clLightSkyGray, fontSize: 16),
-                  ),
-                ],
+            return const Center(
+              child: Text(
+                'No registered users found.',
+                style: TextStyle(color: clLightSkyGray, fontSize: 16),
               ),
             );
           }
 
+          // 4. Data Available State
+          // This ListView.builder will be properly sized by the Scaffold's body.
           return ListView.builder(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            // 5. UPDATED LIST NAME FOR ITEM COUNT (Crucial for preventing RangeError)
             itemCount: provider.registeredUsers.length,
             itemBuilder: (context, index) {
-              // 6. CORRECTLY ACCESSING THE REGISTERED USERS LIST
               final AppUser user = provider.registeredUsers[index];
               return _buildUserListItem(context, user);
             },
@@ -91,97 +113,42 @@ class RegisteredUsersScreen extends StatelessWidget {
   }
 
   Widget _buildUserListItem(BuildContext context, AppUser user) {
+    // This Padding widget is the one referred to in the error.
+    // Since its parent is the ListView.builder, which provides unbounded height
+    // constraints (but manages the scrolling and viewport), this widget itself
+    // will now be laid out correctly as a child of the list.
     return Padding(
       padding: const EdgeInsets.only(bottom: 10.0),
       child: DecoratedBox(
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          // Subtle dark gradient background
-          gradient: LinearGradient(
-            colors: [
-              secondaryAccent.withOpacity(0.1),
-              accentColor.withOpacity(0.1),
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.2),
-              blurRadius: 8,
-              offset: const Offset(0, 4),
-            ),
-          ],
+          color: clDeepBlue.withOpacity(0.5),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: accentColor.withOpacity(0.5)),
         ),
         child: ListTile(
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-
-          // Avatar with gradient border
           leading: Container(
-            padding: const EdgeInsets.all(2),
+            width: 40,
+            height: 40,
             decoration: BoxDecoration(
+              color: accentColor,
               shape: BoxShape.circle,
-              gradient: LinearGradient(
-                colors: [accentColor, secondaryAccent],
-                begin: Alignment.topRight,
-                end: Alignment.bottomLeft,
-              ),
             ),
-            child: CircleAvatar(
-              radius: 24,
-              backgroundColor: clDeepBlue.withOpacity(0.9),
-              child: Text(
-                user.name.isNotEmpty ? user.name[0].toUpperCase() : '?',
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                  color: clCleanWhite,
-                ),
-              ),
+            child: Center(
+              child: Text(user.name[0], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
             ),
           ),
-
-          // User Name
-          title: Text(
-            user.name,
-            style: const TextStyle(
-              fontWeight: FontWeight.w600,
-              fontSize: 17,
-              color: clCleanWhite,
-            ),
-          ),
-
-          // User Phone Number and Email
+          title: Text(user.name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           subtitle: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Phone: ${user.phoneNumber}',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: clLightSkyGray.withOpacity(0.7),
-                ),
-              ),
-              Text(
-                'Email: ${user.email}',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: clLightSkyGray.withOpacity(0.7),
-                ),
-              ),
+              Text('Phone: ${user.phoneNumber}', style: TextStyle(color: clLightSkyGray.withOpacity(0.7))),
+              Text('Email: ${user.email}', style: TextStyle(color: clLightSkyGray.withOpacity(0.7))),
             ],
           ),
-
-          // Action: Example video call button
           trailing: IconButton(
             icon: const Icon(Icons.videocam),
             color: accentColor,
-            onPressed: () {
-              // TODO: Implement call initiation here, similar to previous discussion
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Call button tapped for ${user.name}')),
-              );
-            },
+            onPressed: () => _initiateCall(context, user),
           ),
           onTap: () {
             // Optional: Navigate to user details screen
@@ -191,3 +158,4 @@ class RegisteredUsersScreen extends StatelessWidget {
     );
   }
 }
+

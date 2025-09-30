@@ -57,7 +57,7 @@ class UserListProvider extends ChangeNotifier {
       _registeredUsers = querySnapshot.docs.map((doc) {
         return AppUser.fromFirestore(doc.id, doc.data());
       }).toList();
-
+      print(_registeredUsers.length.toString()+' FJMRFRFRF ');
     } catch (e) {
       _errorMessage = "Failed to fetch registered users: $e";
       print("Error fetching registered users: $e");

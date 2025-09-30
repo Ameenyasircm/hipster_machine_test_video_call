@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hipster_machine_test/core/utils/functions.dart';
 import 'package:hipster_machine_test/features/auth/presentation/pages/registered_members_screen.dart';
 import 'package:provider/provider.dart';
+import '../../../../core/constants/colors.dart';
 import '../../../../core/utils/user_view_alert.dart';
 import '../../widgets/logout_alert.dart';
 import '../providers/users_list_provider.dart';
@@ -15,26 +16,11 @@ class UsersListScreen extends StatelessWidget {
     // This is where you would typically navigate to your video call initiation screen.
     // For demonstration, using a simple SnackBar and the commented-out logic.
     callNext(RegisteredUsersScreen(), context);
-    // Example of how you might navigate (if 'VideoCallScreen' is available)
-    /*
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => VideoCallScreen(
-          // Pass necessary parameters like the current user's ID, signaling service, etc.
-        ),
-      ),
-    );
-    */
   }
 
   @override
   Widget build(BuildContext context) {
     final provider = Provider.of<UserListProvider>(context);
-
-    // Define the vibrant color for accents (Butterfly theme gradient start)
-    const Color accentColor = Color(0xFF00C6FF); // Bright Cyan/Blue
-    // Define the secondary color for gradient/contrast
-    const Color secondaryAccent = Color(0xFF8A2BE2); // Blue-Violet
 
     return Scaffold(
       // 1. Dark Background for the entire screen body
