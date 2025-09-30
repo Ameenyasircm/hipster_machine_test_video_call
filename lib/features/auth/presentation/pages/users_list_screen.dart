@@ -1,20 +1,31 @@
 import 'package:flutter/material.dart';
+import 'package:hipster_machine_test/core/utils/functions.dart';
+import 'package:hipster_machine_test/features/auth/presentation/pages/registered_members_screen.dart';
 import 'package:provider/provider.dart';
-import '../../../../core/constants/colors.dart';
 import '../../../../core/utils/user_view_alert.dart';
 import '../../widgets/logout_alert.dart';
 import '../providers/users_list_provider.dart';
 
-// Assuming clDeepBlue and clCleanWhite are defined in your colors.dart
-// Example definitions (if not provided):
-/*
-const Color clDeepBlue = Color(0xFF0A1828); // Deep, dark background
-const Color clCleanWhite = Color(0xFFF5F5F5); // Nearly white
-const Color clLightSkyGray = Color(0xFFA0B3C9); // Light gray for subtle text
-*/
 
 class UsersListScreen extends StatelessWidget {
   const UsersListScreen({Key? key}) : super(key: key);
+
+  // Placeholder for your navigation function (replace with your actual implementation)
+  void _navigateToVideoCallScreen(BuildContext context) {
+    // This is where you would typically navigate to your video call initiation screen.
+    // For demonstration, using a simple SnackBar and the commented-out logic.
+    callNext(RegisteredUsersScreen(), context);
+    // Example of how you might navigate (if 'VideoCallScreen' is available)
+    /*
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => VideoCallScreen(
+          // Pass necessary parameters like the current user's ID, signaling service, etc.
+        ),
+      ),
+    );
+    */
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -43,7 +54,7 @@ class UsersListScreen extends StatelessWidget {
           ),
           IconButton(
             icon: const Icon(Icons.logout),
-            color: clLightSkyGray, // Subtler color for non-primary action
+            color: Colors.redAccent, // Use a standard color for danger action
             onPressed: () {
               // Assuming showLogoutConfirmationDialog is implemented elsewhere
               showLogoutConfirmationDialog(context);
@@ -171,7 +182,6 @@ class UsersListScreen extends StatelessWidget {
                     onTap: () {
                       // Navigate to User Profile/Details screen
                       showUserDetailsDialog(context,user);
-                      // TODO: Implement navigation to a UserDetailsScreen
                     },
                   ),
                 ),
@@ -180,21 +190,49 @@ class UsersListScreen extends StatelessWidget {
           );
         },
       ),
+
+      // --- FLOATING ACTION BUTTON ADDED HERE ---
+      floatingActionButton: FloatingActionButton.extended(
+        // Use a ShaderMask for the vibrant gradient effect on the background
+        backgroundColor: Colors.transparent,
+        onPressed: () => _navigateToVideoCallScreen(context),
+        elevation: 8, // Add a slight lift
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+
+        label: Ink(
+          decoration: BoxDecoration(
+            // Apply the gradient as a background to the FAB content area
+            gradient: const LinearGradient(
+              colors: [accentColor, secondaryAccent], // Blue to Purple gradient
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(30),
+          ),
+          child: Container(
+            constraints: const BoxConstraints(minHeight: 36.0, minWidth: 80.0),
+            alignment: Alignment.center,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.videocam, color: clCleanWhite, size: 24),
+                SizedBox(width: 8),
+                Text(
+                  'Video Call',
+                  style: TextStyle(
+                      color: clCleanWhite,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      // --- END FLOATING ACTION BUTTON ---
+
     );
   }
 }
-
-// SignalingService? _signalingService;
-// callNext(
-// UserCallScreen(
-// loginUserId: "12345", // required user ID
-// autoAccept: true, // bool, not string
-// callId: "abc123", // optional, can also be null
-// signalingService: _signalingService, // pass your SignalingService instance
-// ),
-// context,
-// );
-// // TODO: Implement navigation to the video call screen
-// ScaffoldMessenger.of(context).showSnackBar(
-// SnackBar(content: Text('Starting call with ${user.name}')),
-// );
