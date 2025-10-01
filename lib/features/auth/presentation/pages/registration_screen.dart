@@ -29,7 +29,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       final provider = Provider.of<LoginProvider>(context, listen: false);
 
       // 💡 UPDATED: Call register without text arguments
-      bool success = await provider.register();
+      bool success = await provider.register(context);
 
       if (success) {
         // Assuming '/users' is the main screen after successful registration

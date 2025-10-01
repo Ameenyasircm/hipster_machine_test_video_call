@@ -6,38 +6,42 @@ import 'package:provider/provider.dart';
 import '../../../../core/constants/colors.dart';
 // ✅ FIXED: Use the same import as user_call_screen.dart
 import '../../../../core/utils/call_service.dart';
+import '../../../../core/utils/functions.dart';
 import '../../../../core/utils/signaling_service.dart' hide SignalingService;
 import '../../data/models/user_model.dart';
 import '../providers/users_list_provider.dart';
 
 class RegisteredUsersScreen extends StatelessWidget {
-  final String currentLoginUserId = "user_1";
+  final String currentLoginUserId = "1759252605383";
 
   const RegisteredUsersScreen({Key? key}) : super(key: key);
 
 // ... inside RegisteredUsersScreen ...
 
   void _initiateCall(BuildContext context, AppUser targetUser) async {
-    const String currentLoginUserId = "user_1";
+    const String currentLoginUserId = "1759253582218";
 
     // 1. DO NOT create SignalingService here.
     // 2. DO NOT start the call here.
 
     // Navigate to call screen, passing the necessary data for it to start the call.
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        // NOTE: UserCallScreen MUST be updated to handle service creation internally
-        // and accept the target user info instead of a pre-created service.
-        builder: (context) => UserCallScreen(
-          loginUserId: currentLoginUserId,
-          // Pass the user the new screen should call
-          // targetUser: targetUser, // <--- New parameter
-          signalingService: null, // <--- Pass null or remove if service is created internally
-          autoAccept: false,
-        ),
-      ),
-    );
+    // Navigator.of(context).push(
+    //   MaterialPageRoute(
+    //     builder: (context) => UserCallScreen(
+    //       loginUserId: currentLoginUserId,
+    //       targetUser: null,        // no target for incoming
+    //       signalingService: null,  // let the screen handle service
+    //       autoAccept: true,        // automatically accept the incoming call
+    //     ),
+    //   ),
+    // );
 
+    callNextReplacement(UserCallScreen(
+      // callId: callId,
+      // autoAccept: true,
+      // signalingService: _signalingService,
+      loginUserId: currentLoginUserId,
+    ), context);
     // Optional: Show a brief "Connecting..." snackbar
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('Connecting to ${targetUser.name}...')),

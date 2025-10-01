@@ -1,5 +1,8 @@
   import 'dart:collection';
   import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/material.dart';
+import 'package:hipster_machine_test/core/utils/functions.dart';
+import 'package:hipster_machine_test/features/auth/presentation/pages/users_list_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
   import 'package:flutter/cupertino.dart';
   import 'package:cloud_firestore/cloud_firestore.dart';
@@ -30,12 +33,24 @@ import 'package:shared_preferences/shared_preferences.dart';
             .get();
 
         if (querySnapshot.docs.isNotEmpty) {
-          _user = querySnapshot.docs.first.data();
+          final doc = querySnapshot.docs.first;
+          _user = doc.data(); // ✅ this is Map<String, dynamic>
+
+          // ✅ Safely extract values (null-aware)
+          final String userId = _user?['id'] ?? '';
+          final String userEmail = _user?['email'] ?? '';
+          final String userName = _user?['name'] ?? '';
+          final String userPhone = _user?['phoneNumber'] ?? '';
+          final String fcmToken = _user?['fcmToken'] ?? '';
 
           // ✅ Save login state locally
           final prefs = await SharedPreferences.getInstance();
           await prefs.setBool('isLoggedIn', true);
-          await prefs.setString('userEmail', email);
+          await prefs.setString('userId', userId);
+          await prefs.setString('userEmail', userEmail);
+          await prefs.setString('name', userName);
+          await prefs.setString('phone', userPhone);
+          await prefs.setString('fcmToken', fcmToken);
 
           _isLoading = false;
           notifyListeners();
@@ -45,7 +60,7 @@ import 'package:shared_preferences/shared_preferences.dart';
         }
       } catch (e) {
         _errorMessage = "Login failed: $e";
-        print(e.toString()+' EJFMJRKF ');
+        print("$e EJFMJRKF");
       }
 
       _isLoading = false;
@@ -73,7 +88,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 // and the state management logic (_isLoading, _errorMessage, notifyListeners)
 // and helper functions (getFcmToken, clearControllers, saveLoginState)
 
-    Future<bool> register() async {
+    Future<bool> register(BuildContext context) async {
       _isLoading = true;
       _errorMessage = null;
       notifyListeners();
@@ -140,7 +155,17 @@ import 'package:shared_preferences/shared_preferences.dart';
         // 💡 OPTIONAL: Clear controllers on success
         clearControllers();
 
-        saveLoginState(email);
+        saveLoginState(_user!);
+
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(
+            builder: (context) => UsersListScreen(userID: id, userName: name,
+
+            ),
+          ),
+              (route) => false,
+        );
+
         _isLoading = false;
         notifyListeners();
         return true;
@@ -170,16 +195,28 @@ import 'package:shared_preferences/shared_preferences.dart';
       phoneController.clear();
       emailController.clear();
       passwordController.clear();
-    }      Future<void> saveLoginState(String email) async {
+    }  Future<void> saveLoginState(Map<String, dynamic> user) async {
       final prefs = await SharedPreferences.getInstance();
+
       await prefs.setBool('isLoggedIn', true);
-      await prefs.setString('userEmail', email);
+      await prefs.setString('userId', user['id'] ?? '');
+      await prefs.setString('userEmail', user['email'] ?? '');
+      await prefs.setString('name', user['name'] ?? '');
+      await prefs.setString('phone', user['phoneNumber'] ?? '');
+      await prefs.setString('fcmToken', user['fcmToken'] ?? '');
     }
+
     Future<void> logout() async {
       _user = null;
+
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('isLoggedIn');
+      await prefs.remove('userId');
       await prefs.remove('userEmail');
+      await prefs.remove('name');
+      await prefs.remove('phone');
+      await prefs.remove('fcmToken');
+
       notifyListeners();
     }
   }

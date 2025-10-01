@@ -36,10 +36,11 @@ class _SplashScreenState extends State<SplashScreen> {
   Future<void> checkLoginStatus() async {
     final prefs = await SharedPreferences.getInstance();
     final isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
-    print('$isLoggedIn FRNRJKNRF');
+    final userID = prefs.getString('userId').toString();
+    final userName   = prefs.getString('name').toString();
 
     if (isLoggedIn) {
-      callNextReplacement(const UsersListScreen(), context);
+      callNextReplacement( UsersListScreen(userName:userID ,userID: userName,), context);
     } else {
       callNextReplacement(const LoginScreen(), context);
     }
@@ -60,14 +61,6 @@ class _SplashScreenState extends State<SplashScreen> {
               style: TextStyle(
                 color: clCleanWhite,
                 fontSize: 30,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            Text(
-              'Ameen yasir',
-              style: TextStyle(
-                color: clCleanWhite,
-                fontSize: 15,
                 fontWeight: FontWeight.bold,
               ),
             ),

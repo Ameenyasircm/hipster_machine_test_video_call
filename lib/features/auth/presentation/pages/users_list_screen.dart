@@ -9,7 +9,8 @@ import '../providers/users_list_provider.dart';
 
 
 class UsersListScreen extends StatelessWidget {
-  const UsersListScreen({Key? key}) : super(key: key);
+  String userID, userName;
+   UsersListScreen({Key? key,required this.userID, required this.userName}) : super(key: key);
 
   // Placeholder for your navigation function (replace with your actual implementation)
   void _navigateToVideoCallScreen(BuildContext context) {
