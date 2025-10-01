@@ -6,10 +6,6 @@ import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:hipster_machine_test/features/auth/presentation/pages/splash_screen.dart';
 import 'package:hipster_machine_test/features/auth/presentation/providers/login_provider.dart';
 import 'package:hipster_machine_test/features/auth/presentation/providers/users_list_provider.dart';
-import 'features/auth/presentation/pages/login_screen.dart';
-import 'features/auth/presentation/pages/registration_screen.dart';
-import 'features/auth/presentation/pages/users_list_screen.dart';
-import 'features/auth/presentation/providers/notification_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
