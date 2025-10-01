@@ -1,347 +1,612 @@
+// lib/features/auth/presentation/pages/video_call_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:async';
 
-import '../../../../core/utils/signaling_service.dart';
-import '../../data/models/user_model.dart';
-
-class UserCallScreen extends StatefulWidget {
+class VideoCallingScreen extends StatefulWidget {
   final String loginUserId;
-  final AppUser? targetUser; // target user to call
-  final bool autoAccept;
-  final SignalingService? signalingService;
+  final String channelName;
+  final String targetUserName;
+  final bool isCaller;
 
-  const UserCallScreen({
+  const VideoCallingScreen({
     Key? key,
     required this.loginUserId,
-    this.targetUser,
-    this.autoAccept = false,
-    this.signalingService,
+    required this.channelName,
+    required this.targetUserName,
+    required this.isCaller,
   }) : super(key: key);
 
   @override
-  _UserCallScreenState createState() => _UserCallScreenState();
+  State<VideoCallingScreen> createState() => _VideoCallingScreenState();
 }
 
-class _UserCallScreenState extends State<UserCallScreen> {
+class _VideoCallingScreenState extends State<VideoCallingScreen> {
   final RTCVideoRenderer _localRenderer = RTCVideoRenderer();
   final RTCVideoRenderer _remoteRenderer = RTCVideoRenderer();
-  late SignalingService _signaling;
+
+  RTCPeerConnection? _peerConnection;
+  MediaStream? _localStream;
 
   bool _inCall = false;
-  bool _incomingCall = false;
-  bool _showLocalVideo = false;
-  String _callStatus = 'waiting';
-  String? _callId;
-  String? _callerName = 'MP';
+  bool _isConnecting = false;
+  bool _remoteDescriptionSet = false;
+
+  final List<RTCIceCandidate> _remoteCandidatesQueue = [];
+  StreamSubscription? _offerSubscription;
+  StreamSubscription? _answerSubscription;
+  StreamSubscription? _candidateSubscription;
+  StreamSubscription? _callStatusSubscription;
 
   @override
   void initState() {
-    print('FROFMRJIMRFR ');
     super.initState();
-    _callId = widget.targetUser?.id;
-    _initRenderers();
-    _initSignaling();
-
-    // Auto-accept call
-    if (widget.autoAccept && widget.targetUser?.id != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _acceptCall();
-      });
-    }
-  }
-
-  void _initRenderers() async {
-    await _localRenderer.initialize();
-    await _remoteRenderer.initialize();
-  }
-
-  void _initSignaling() {
-    _signaling = widget.signalingService ??
-        SignalingService(
-          onRemoteStream: (stream) {
-            print('Remote stream received with ${stream.getTracks().length} tracks');
-            if (mounted) {
-              setState(() {
-                _remoteRenderer.srcObject = stream;
-                _callStatus = 'active';
-                _inCall = true;
-              });
-            }
-          },
-          onCallEnded: () {
-            print('Call ended');
-            _resetCall();
-          },
-          onCallStatusChanged: (status) {
-            print('Call status changed: $status');
-            if (mounted) {
-              setState(() => _callStatus = status);
-              if (status == 'ended' || status == 'rejected') _resetCall();
-            }
-          },
-          onIncomingCall: (callId) {
-            print('Incoming call: $callId');
-            if (mounted) {
-              setState(() {
-                _incomingCall = true;
-                _callStatus = 'incoming';
-                _callId = callId;
-              });
-              _showIncomingCallDialog();
-            }
-          },
-        );
-
-    _signaling.listenForIncomingCalls(widget.loginUserId);
-
-    if (widget.targetUser != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _startOutgoingCall(widget.targetUser!);
-      });
-    }
-  }
-
-  void _startOutgoingCall(AppUser target) async {
-    print('Starting outgoing call to ${target.name}');
-    setState(() {
-      _showLocalVideo = true;
-      _callStatus = 'connecting';
-    });
-
-    // Ensure local media is ready
-    await _signaling.initializeMedia();
-
-    if (_signaling.localStream != null) {
-      setState(() {
-        _localRenderer.srcObject = _signaling.localStream;
-      });
-    }
-
-    // Start the call
-    await _signaling.createCall(target.id);
-  }
-
-  void _acceptCall() async {
-    print('Accepting call...');
-    setState(() {
-      _incomingCall = false;
-      _showLocalVideo = true;
-      _callStatus = 'connecting';
-    });
-
-    // Initialize local media stream
-    await _signaling.initializeMedia();
-
-    if (_signaling.localStream != null) {
-      setState(() => _localRenderer.srcObject = _signaling.localStream);
-    }
-
-    // Accept the call
-    await _signaling.acceptCall();
-  }
-
-  void _rejectCall() {
-    _signaling.rejectCall();
-    _resetCall();
-    Navigator.of(context).pop();
-  }
-
-  void _endCall() {
-    _signaling.endCall();
-    _resetCall();
-    Navigator.of(context).pop();
-  }
-
-  void _resetCall() {
-    setState(() {
-      _inCall = false;
-      _incomingCall = false;
-      _showLocalVideo = false;
-      _callStatus = 'waiting';
-      _callId = null;
-    });
-    _remoteRenderer.srcObject = null;
-    _localRenderer.srcObject = null;
-  }
-
-  void _showIncomingCallDialog() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => WillPopScope(
-        onWillPop: () async => false,
-        child: AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Column(
-            children: [
-              CircleAvatar(
-                radius: 40,
-                backgroundColor: Colors.blue,
-                child: Icon(Icons.person, size: 40, color: Colors.white),
-              ),
-              SizedBox(height: 16),
-              Text('Incoming Video Call', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text('$_callerName is calling you', textAlign: TextAlign.center, style: TextStyle(fontSize: 16)),
-              SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  FloatingActionButton(
-                    onPressed: _rejectCall,
-                    backgroundColor: Colors.red,
-                    child: Icon(Icons.call_end, color: Colors.white),
-                    heroTag: "reject",
-                  ),
-                  FloatingActionButton(
-                    onPressed: _acceptCall,
-                    backgroundColor: Colors.green,
-                    child: Icon(Icons.videocam, color: Colors.white),
-                    heroTag: "accept",
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  String _getStatusText() {
-    switch (_callStatus) {
-      case 'waiting': return 'Waiting for calls...';
-      case 'incoming': return 'Incoming call from $_callerName';
-      case 'connecting': return 'Connecting...';
-      case 'active': return 'In call with $_callerName';
-      case 'ended': return 'Call ended';
-      case 'rejected': return 'Call rejected';
-      default: return 'Ready';
-    }
-  }
-
-  Color _getStatusColor() {
-    switch (_callStatus) {
-      case 'waiting': return Colors.blue;
-      case 'incoming': return Colors.orange;
-      case 'connecting': return Colors.orange;
-      case 'active': return Colors.green;
-      case 'ended':
-      case 'rejected': return Colors.red;
-      default: return Colors.grey;
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Column(
-        children: [
-          Container(
-            width: double.infinity,
-            padding: EdgeInsets.all(16),
-            color: _getStatusColor().withOpacity(0.1),
-            child: Column(
-              children: [
-                Icon(
-                  _callStatus == 'active'
-                      ? Icons.videocam
-                      : _callStatus == 'incoming'
-                      ? Icons.phone_in_talk
-                      : Icons.phone_disabled,
-                  color: _getStatusColor(),
-                  size: 24,
-                ),
-                SizedBox(height: 8),
-                Text(_getStatusText(), style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: _getStatusColor())),
-              ],
-            ),
-          ),
-          Expanded(
-            child: Container(
-              color: Colors.black,
-              child: _inCall
-                  ? Stack(
-                children: [
-                  if (_callStatus == 'active')
-                    Positioned.fill(
-                      child: RTCVideoView(_remoteRenderer, objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover),
-                    ),
-                  if (_showLocalVideo)
-                    Positioned(
-                      top: 20,
-                      right: 20,
-                      width: 120,
-                      height: 160,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.white, width: 2),
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(10),
-                          child: RTCVideoView(_localRenderer, mirror: true, objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover),
-                        ),
-                      ),
-                    ),
-                  if (_callStatus == 'connecting')
-                    Positioned.fill(
-                      child: Container(
-                        color: Colors.black54,
-                        child: Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.white)),
-                              SizedBox(height: 20),
-                              Text('Connecting to call...', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w500)),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              )
-                  : Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.phone_disabled, size: 80, color: Colors.grey[400]),
-                    SizedBox(height: 20),
-                    Text('No active calls', style: TextStyle(fontSize: 18, color: Colors.grey[600])),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          if (_inCall)
-            Container(
-              padding: EdgeInsets.all(20),
-              child: ElevatedButton.icon(
-                onPressed: _endCall,
-                icon: Icon(Icons.call_end, color: Colors.white),
-                label: Text('End Call', style: TextStyle(color: Colors.white)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red,
-                  padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
+    _initializeCall();
   }
 
   @override
   void dispose() {
-    _localRenderer.dispose();
-    _remoteRenderer.dispose();
-    if (!widget.autoAccept) _signaling.dispose();
+    _cleanup();
     super.dispose();
+  }
+
+  Future<void> _cleanup() async {
+    // Cancel all subscriptions
+    await _offerSubscription?.cancel();
+    await _answerSubscription?.cancel();
+    await _candidateSubscription?.cancel();
+    await _callStatusSubscription?.cancel();
+
+    // Stop local stream
+    _localStream?.getTracks().forEach((track) => track.stop());
+    _localStream?.dispose();
+
+    // Close peer connection
+    await _peerConnection?.close();
+
+    // Dispose renderers
+    await _localRenderer.dispose();
+    await _remoteRenderer.dispose();
+  }
+
+  Future<void> _initializeCall() async {
+    setState(() => _isConnecting = true);
+
+    await _localRenderer.initialize();
+    await _remoteRenderer.initialize();
+    await _initLocalStream();
+    await _createPeerConnection();
+
+    // Listen for call status changes
+    _listenToCallStatus();
+
+    if (widget.isCaller) {
+      // CALLER: Create and send offer
+      await _createAndSendOffer();
+      // Listen for answer from receiver
+      _listenForAnswer();
+    } else {
+      // RECEIVER: Listen for offer from caller
+      _listenForOffer();
+    }
+
+    // Both listen for ICE candidates
+    _listenForIceCandidates();
+  }
+
+  // WebRTC Configuration
+  Map<String, dynamic> get _configuration => {
+    'iceServers': [
+      {'urls': 'stun:stun.l.google.com:19302'},
+      {'urls': 'stun:stun1.l.google.com:19302'},
+      {'urls': 'stun:stun2.l.google.com:19302'},
+    ],
+    'sdpSemantics': 'unified-plan',
+  };
+
+  Map<String, dynamic> get _constraints => {
+    'mandatory': {},
+    'optional': [
+      {'DtlsSrtpKeyAgreement': true},
+    ],
+  };
+
+  Map<String, dynamic> get _mediaConstraints => {
+    'audio': true,
+    'video': {
+      'mandatory': {
+        'minWidth': '640',
+        'minHeight': '480',
+        'minFrameRate': '30',
+      },
+      'facingMode': 'user',
+      'optional': [],
+    }
+  };
+
+  // Initialize local media stream
+  Future<void> _initLocalStream() async {
+    try {
+      _localStream = await navigator.mediaDevices.getUserMedia(_mediaConstraints);
+      _localRenderer.srcObject = _localStream;
+      setState(() {});
+    } catch (e) {
+      print('Error getting user media: $e');
+      _showError('Failed to access camera/microphone');
+    }
+  }
+
+  // Create peer connection
+  Future<void> _createPeerConnection() async {
+    try {
+      _peerConnection = await createPeerConnection(_configuration, _constraints);
+
+      // Add local stream tracks
+      _localStream?.getTracks().forEach((track) {
+        _peerConnection?.addTrack(track, _localStream!);
+      });
+
+      // Handle ICE candidates
+      _peerConnection?.onIceCandidate = (RTCIceCandidate candidate) {
+        print('Generated ICE candidate');
+        _sendIceCandidate(candidate);
+      };
+
+      // Handle remote stream
+      _peerConnection?.onTrack = (RTCTrackEvent event) {
+        print('Received remote track: ${event.track.kind}');
+        if (event.streams.isNotEmpty) {
+          setState(() {
+            _remoteRenderer.srcObject = event.streams[0];
+          });
+        }
+      };
+
+      // Handle connection state changes
+      _peerConnection?.onConnectionState = (RTCPeerConnectionState state) {
+        print('Connection state: $state');
+        if (state == RTCPeerConnectionState.RTCPeerConnectionStateConnected) {
+          setState(() {
+            _inCall = true;
+            _isConnecting = false;
+          });
+          // Update call status in Firestore
+          _updateCallStatus('connected');
+        } else if (state == RTCPeerConnectionState.RTCPeerConnectionStateFailed ||
+            state == RTCPeerConnectionState.RTCPeerConnectionStateDisconnected) {
+          _handleCallEnd();
+        }
+      };
+
+      _peerConnection?.onIceConnectionState = (RTCIceConnectionState state) {
+        print('ICE connection state: $state');
+      };
+
+      _peerConnection?.onSignalingState = (RTCSignalingState state) {
+        print('Signaling state: $state');
+      };
+    } catch (e) {
+      print('Error creating peer connection: $e');
+      _showError('Failed to create connection');
+    }
+  }
+
+  // ============================================
+  // CALLER METHODS
+  // ============================================
+
+  Future<void> _createAndSendOffer() async {
+    if (_peerConnection == null) return;
+
+    try {
+      print('Creating offer...');
+      RTCSessionDescription offer = await _peerConnection!.createOffer();
+      await _peerConnection!.setLocalDescription(offer);
+
+      // Save offer to Firestore
+      await FirebaseFirestore.instance
+          .collection('calls')
+          .doc(widget.channelName)
+          .collection('signaling')
+          .doc('offer')
+          .set({
+        'type': 'offer',
+        'sdp': offer.sdp,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+      print('Offer sent successfully');
+    } catch (e) {
+      print('Error creating offer: $e');
+      _showError('Failed to create call');
+    }
+  }
+
+  void _listenForAnswer() {
+    _answerSubscription = FirebaseFirestore.instance
+        .collection('calls')
+        .doc(widget.channelName)
+        .collection('signaling')
+        .doc('answer')
+        .snapshots()
+        .listen((snapshot) {
+      if (snapshot.exists && snapshot.data() != null) {
+        final data = snapshot.data()!;
+        if (data['type'] == 'answer' && data['sdp'] != null) {
+          print('Received answer from receiver');
+          _handleRemoteAnswer(RTCSessionDescription(data['sdp'], 'answer'));
+        }
+      }
+    });
+  }
+
+  Future<void> _handleRemoteAnswer(RTCSessionDescription answer) async {
+    if (_peerConnection == null || _remoteDescriptionSet) return;
+
+    try {
+      await _peerConnection!.setRemoteDescription(answer);
+      _remoteDescriptionSet = true;
+      print('Remote answer set successfully');
+
+      // Process queued ICE candidates
+      for (var candidate in _remoteCandidatesQueue) {
+        await _peerConnection!.addCandidate(candidate);
+      }
+      _remoteCandidatesQueue.clear();
+    } catch (e) {
+      print('Error handling remote answer: $e');
+    }
+  }
+
+  // ============================================
+  // RECEIVER METHODS
+  // ============================================
+
+  void _listenForOffer() {
+    _offerSubscription = FirebaseFirestore.instance
+        .collection('calls')
+        .doc(widget.channelName)
+        .collection('signaling')
+        .doc('offer')
+        .snapshots()
+        .listen((snapshot) {
+      if (snapshot.exists && snapshot.data() != null) {
+        final data = snapshot.data()!;
+        if (data['type'] == 'offer' && data['sdp'] != null) {
+          print('Received offer from caller');
+          _handleRemoteOffer(RTCSessionDescription(data['sdp'], 'offer'));
+        }
+      }
+    });
+  }
+
+  Future<void> _handleRemoteOffer(RTCSessionDescription offer) async {
+    if (_peerConnection == null || _remoteDescriptionSet) return;
+
+    try {
+      // Check current signaling state
+      final signalingState = await _peerConnection!.getSignalingState();
+      print('Current signaling state: $signalingState');
+
+      // Prevent setting remote offer if already have local offer
+      if (signalingState == RTCSignalingState.RTCSignalingStateHaveLocalOffer) {
+        print('ERROR: Already in have-local-offer state! Resetting...');
+        await _resetConnection();
+        return;
+      }
+
+      // Set remote description (the offer)
+      await _peerConnection!.setRemoteDescription(offer);
+      _remoteDescriptionSet = true;
+      print('Remote offer set successfully');
+
+      // Process queued ICE candidates
+      for (var candidate in _remoteCandidatesQueue) {
+        await _peerConnection!.addCandidate(candidate);
+      }
+      _remoteCandidatesQueue.clear();
+
+      // Create and send answer
+      await _createAndSendAnswer();
+    } catch (e) {
+      print('Error handling remote offer: $e');
+      _showError('Failed to establish connection');
+    }
+  }
+
+  Future<void> _createAndSendAnswer() async {
+    if (_peerConnection == null) return;
+
+    try {
+      print('Creating answer...');
+      RTCSessionDescription answer = await _peerConnection!.createAnswer();
+      await _peerConnection!.setLocalDescription(answer);
+
+      // Save answer to Firestore
+      await FirebaseFirestore.instance
+          .collection('calls')
+          .doc(widget.channelName)
+          .collection('signaling')
+          .doc('answer')
+          .set({
+        'type': 'answer',
+        'sdp': answer.sdp,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+      print('Answer sent successfully');
+
+      // Update call status to accepted
+      _updateCallStatus('accepted');
+    } catch (e) {
+      print('Error creating answer: $e');
+      _showError('Failed to answer call');
+    }
+  }
+
+  // ============================================
+  // ICE CANDIDATE HANDLING
+  // ============================================
+
+  void _sendIceCandidate(RTCIceCandidate candidate) {
+    FirebaseFirestore.instance
+        .collection('calls')
+        .doc(widget.channelName)
+        .collection('candidates')
+        .add({
+      'candidate': candidate.candidate,
+      'sdpMid': candidate.sdpMid,
+      'sdpMLineIndex': candidate.sdpMLineIndex,
+      'senderId': widget.loginUserId,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  void _listenForIceCandidates() {
+    _candidateSubscription = FirebaseFirestore.instance
+        .collection('calls')
+        .doc(widget.channelName)
+        .collection('candidates')
+        .where('senderId', isNotEqualTo: widget.loginUserId)
+        .snapshots()
+        .listen((snapshot) {
+      for (var change in snapshot.docChanges) {
+        if (change.type == DocumentChangeType.added) {
+          final data = change.doc.data();
+          if (data != null) {
+            final candidate = RTCIceCandidate(
+              data['candidate'],
+              data['sdpMid'],
+              data['sdpMLineIndex'],
+            );
+            _handleRemoteIceCandidate(candidate);
+          }
+        }
+      }
+    });
+  }
+
+  Future<void> _handleRemoteIceCandidate(RTCIceCandidate candidate) async {
+    if (_peerConnection == null) return;
+
+    try {
+      // Queue candidates if remote description not set yet
+      if (!_remoteDescriptionSet) {
+        print('Queueing ICE candidate');
+        _remoteCandidatesQueue.add(candidate);
+        return;
+      }
+
+      await _peerConnection!.addCandidate(candidate);
+      print('Added remote ICE candidate');
+    } catch (e) {
+      print('Error adding ICE candidate: $e');
+    }
+  }
+
+  // ============================================
+  // CALL STATUS & CLEANUP
+  // ============================================
+
+  void _listenToCallStatus() {
+    _callStatusSubscription = FirebaseFirestore.instance
+        .collection('calls')
+        .doc(widget.channelName)
+        .snapshots()
+        .listen((snapshot) {
+      if (snapshot.exists) {
+        final status = snapshot.data()?['status'];
+        if (status == 'ended' && mounted) {
+          _handleCallEnd();
+        }
+      }
+    });
+  }
+
+  Future<void> _updateCallStatus(String status) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('calls')
+          .doc(widget.channelName)
+          .update({'status': status});
+    } catch (e) {
+      print('Error updating call status: $e');
+    }
+  }
+
+  Future<void> _resetConnection() async {
+    await _peerConnection?.close();
+    _remoteDescriptionSet = false;
+    _remoteCandidatesQueue.clear();
+    await _createPeerConnection();
+  }
+
+  void _handleCallEnd() {
+    if (!mounted) return;
+    Navigator.of(context).pop();
+  }
+
+  Future<void> _endCall() async {
+    await _updateCallStatus('ended');
+
+    // Delete call signaling data
+    await FirebaseFirestore.instance
+        .collection('calls')
+        .doc(widget.channelName)
+        .collection('signaling')
+        .get()
+        .then((snapshot) {
+      for (var doc in snapshot.docs) {
+        doc.reference.delete();
+      }
+    });
+
+    await FirebaseFirestore.instance
+        .collection('calls')
+        .doc(widget.channelName)
+        .collection('candidates')
+        .get()
+        .then((snapshot) {
+      for (var doc in snapshot.docs) {
+        doc.reference.delete();
+      }
+    });
+
+    if (mounted) {
+      Navigator.of(context).pop();
+    }
+  }
+
+  void _showError(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+      ),
+    );
+  }
+
+  // ============================================
+  // UI
+  // ============================================
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: SafeArea(
+        child: Stack(
+          children: [
+            // Remote video (full screen)
+            Center(
+              child: _remoteRenderer.srcObject != null
+                  ? RTCVideoView(_remoteRenderer, mirror: false, objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover)
+                  : Container(
+                color: Colors.black,
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      if (_isConnecting) ...[
+                        CircularProgressIndicator(color: Colors.white),
+                        SizedBox(height: 20),
+                        Text(
+                          widget.isCaller ? 'Calling ${widget.targetUserName}...' : 'Connecting...',
+                          style: TextStyle(color: Colors.white, fontSize: 18),
+                        ),
+                      ] else ...[
+                        Icon(Icons.person, size: 80, color: Colors.white54),
+                        SizedBox(height: 20),
+                        Text(
+                          widget.targetUserName,
+                          style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+            // Local video (small overlay)
+            Positioned(
+              top: 40,
+              right: 20,
+              width: 120,
+              height: 160,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.white, width: 2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: _localRenderer.srcObject != null
+                      ? RTCVideoView(_localRenderer, mirror: true, objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover)
+                      : Container(color: Colors.grey[800]),
+                ),
+              ),
+            ),
+
+            // Top bar with call info
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: Container(
+                padding: EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Colors.black54, Colors.transparent],
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    Text(
+                      widget.targetUserName,
+                      style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                    ),
+                    SizedBox(height: 5),
+                    Text(
+                      _inCall ? 'Connected' : (_isConnecting ? 'Connecting...' : 'Ringing...'),
+                      style: TextStyle(color: Colors.white70, fontSize: 14),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // Bottom controls
+            Positioned(
+              bottom: 40,
+              left: 0,
+              right: 0,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // End call button
+                  GestureDetector(
+                    onTap: _endCall,
+                    child: Container(
+                      width: 70,
+                      height: 70,
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(Icons.call_end, color: Colors.white, size: 35),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

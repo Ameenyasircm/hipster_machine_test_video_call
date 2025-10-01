@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../../../core/utils/signaling_service.dart';
+import '../../data/models/registered_members_model.dart';
 import '../../data/models/user_model.dart';
 
 class UserListProvider extends ChangeNotifier {
@@ -66,6 +67,7 @@ class UserListProvider extends ChangeNotifier {
     _isLoading = false;
     notifyListeners();
   }
+
 
 
 }

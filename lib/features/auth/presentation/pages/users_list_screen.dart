@@ -1,28 +1,120 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:hipster_machine_test/core/utils/functions.dart';
 import 'package:hipster_machine_test/features/auth/presentation/pages/registered_members_screen.dart';
+import 'package:hipster_machine_test/features/auth/presentation/pages/video_room_screen.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/constants/colors.dart';
 import '../../../../core/utils/user_view_alert.dart';
 import '../../widgets/logout_alert.dart';
+import '../providers/call_provider.dart';
 import '../providers/users_list_provider.dart';
 
 
-class UsersListScreen extends StatelessWidget {
-  String userID, userName;
-   UsersListScreen({Key? key,required this.userID, required this.userName}) : super(key: key);
+class UsersListScreen extends StatefulWidget {
+  String userID, userName,from;
+   UsersListScreen({Key? key,required this.userID, required this.userName, required this.from}) : super(key: key);
 
+  @override
+  State<UsersListScreen> createState() => _UsersListScreenState();
+}
+
+class _UsersListScreenState extends State<UsersListScreen> {
   // Placeholder for your navigation function (replace with your actual implementation)
   void _navigateToVideoCallScreen(BuildContext context) {
     // This is where you would typically navigate to your video call initiation screen.
     // For demonstration, using a simple SnackBar and the commented-out logic.
-    callNext(RegisteredUsersScreen(), context);
+    callNext(RegisteredUsersScreen(currentLoginUserId: widget.userID,), context);
+  }
+
+  bool _isDialogShowing = false;
+  String? _activeCallId;
+
+  @override
+  void initState() {
+    super.initState();
+    // _listenForIncomingCalls();
+    print(widget.userName+' RKJFRJK FR F');
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<CallProvider>(context, listen: false)
+          .listenForIncomingCalls(context, widget.userName);
+    });
+  }
+
+  void _listenForIncomingCalls() {
+    final loggedInUserId = widget.userID;
+
+    FirebaseFirestore.instance
+        .collection('calls')
+        .where('receiverId', isEqualTo: loggedInUserId)
+        .where('status', isEqualTo: 'ringing')
+        .get()
+        .then((snapshot) {
+      if (snapshot.docs.isNotEmpty) {
+        final callDoc = snapshot.docs.first;
+        final callData = callDoc.data();
+        final channelName = callData['channelName'];
+        final callerId = callData['callerId'];
+
+        // ✅ Prevent same dialog opening again
+        if (_isDialogShowing && _activeCallId == channelName) return;
+
+        _isDialogShowing = true;
+        _activeCallId = channelName;
+
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => AlertDialog(
+            title: const Text("Incoming Call"),
+            content: Text("User $callerId is calling you."),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  _isDialogShowing = false;
+
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => VideoCallingScreen(
+                        loginUserId: loggedInUserId,
+                        channelName: channelName,
+                        targetUserName: callerId,
+                      ),
+                    ),
+                  );
+
+                  FirebaseFirestore.instance
+                      .collection('calls')
+                      .doc(channelName)
+                      .update({'status': 'accepted'});
+                },
+                child: const Text("Accept"),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  _isDialogShowing = false;
+
+                  FirebaseFirestore.instance
+                      .collection('calls')
+                      .doc(channelName)
+                      .update({'status': 'ended'});
+                },
+                child: const Text("Decline"),
+              ),
+            ],
+          ),
+        );
+      }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final provider = Provider.of<UserListProvider>(context);
-
+    print(widget.from+' FKJR JKF RF ');
     return Scaffold(
       // 1. Dark Background for the entire screen body
       backgroundColor: clDeepBlue,

@@ -1,83 +1,152 @@
 // lib/features/users/screens/users_list_screen.dart
-
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:hipster_machine_test/features/auth/presentation/pages/video_call_screen.dart';
 import 'package:provider/provider.dart';
-import '../../../../core/constants/colors.dart';
-// ✅ FIXED: Use the same import as user_call_screen.dart
-import '../../../../core/utils/call_service.dart';
-import '../../../../core/utils/functions.dart';
-import '../../../../core/utils/signaling_service.dart' hide SignalingService;
+
+// Import the new VideoCallingScreen
+import '../../../../core/constants/colors.dart'; // Assume this path is correct
+import '../../data/models/registered_members_model.dart';
 import '../../data/models/user_model.dart';
 import '../providers/users_list_provider.dart';
 
+// Assuming clDeepBlue, accentColor, clLightSkyGray are defined in colors.dart
+
 class RegisteredUsersScreen extends StatelessWidget {
-  final String currentLoginUserId = "1759252605383";
+  final String currentLoginUserId;
 
-  const RegisteredUsersScreen({Key? key}) : super(key: key);
-
-// ... inside RegisteredUsersScreen ...
+  RegisteredUsersScreen({Key? key, required this.currentLoginUserId}) : super(key: key);
 
   void _initiateCall(BuildContext context, AppUser targetUser) async {
-    const String currentLoginUserId = "1759253582218";
+    // 1. Create a unique channel name per call
+    String channelName = "${currentLoginUserId}_${targetUser.id}_${DateTime.now().millisecondsSinceEpoch}";
 
-    // 1. DO NOT create SignalingService here.
-    // 2. DO NOT start the call here.
+    // 2. Save call info in Firestore (initial setup)
+    final callDoc = FirebaseFirestore.instance.collection('calls').doc(channelName);
+    await callDoc.set({
+      'callerId': currentLoginUserId,
+      'receiverId': targetUser.id,
+      'channelName': channelName,
+      'status': 'ringing', // ringing, accepted, ended
+      'createdAt': FieldValue.serverTimestamp(),
+    });
 
-    // Navigate to call screen, passing the necessary data for it to start the call.
-    // Navigator.of(context).push(
-    //   MaterialPageRoute(
-    //     builder: (context) => UserCallScreen(
-    //       loginUserId: currentLoginUserId,
-    //       targetUser: null,        // no target for incoming
-    //       signalingService: null,  // let the screen handle service
-    //       autoAccept: true,        // automatically accept the incoming call
-    //     ),
-    //   ),
-    // );
+    // 3. Navigate to VideoCallingScreen
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => VideoCallingScreen(
+          loginUserId: currentLoginUserId,
+          channelName: channelName,
+          targetUserName: targetUser.name,
+          isCaller: true, // This user is initiating the call
+        ),
+      ),
+    );
 
-    callNextReplacement(UserCallScreen(
-      // callId: callId,
-      // autoAccept: true,
-      // signalingService: _signalingService,
-      loginUserId: currentLoginUserId,
-    ), context);
-    // Optional: Show a brief "Connecting..." snackbar
+    // Optional: show connecting snackbar
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Connecting to ${targetUser.name}...')),
+      SnackBar(content: Text('Calling ${targetUser.name}...')),
     );
   }
 
-// ... rest of RegisteredUsersScreen remains the same ...
+  // Listener to handle incoming calls (outside the main build)
+  void _listenForIncomingCalls(BuildContext context) {
+    FirebaseFirestore.instance
+        .collection('calls')
+        .where('receiverId', isEqualTo: currentLoginUserId)
+        .where('status', isEqualTo: 'ringing')
+        .snapshots()
+        .listen((snapshot) {
+      if (snapshot.docs.isNotEmpty) {
+        // Handle only the most recent call
+        final callData = snapshot.docs.first.data();
+        final channelName = callData['channelName'];
+        final callerId = callData['callerId'];
+
+        // Prevent showing dialog multiple times
+        if (ModalRoute.of(context)?.isCurrent ?? false) {
+          _showIncomingCallDialog(context, channelName, callerId);
+        }
+      }
+    });
+  }
+
+  void _showIncomingCallDialog(BuildContext context, String channelName, String callerId) {
+    // Look up caller's name (requires another db fetch or a local cache)
+    // For simplicity, we'll use a placeholder or another fetch.
+    String callerName = "Another User"; // Replace with actual name fetch if needed
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: Text("Incoming Call from $callerName"),
+          content: const Text("Do you want to accept the video call?"),
+          actions: <Widget>[
+            TextButton(
+              child: const Text("Decline", style: TextStyle(color: Colors.red)),
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+                // Update call status to 'ended'
+                FirebaseFirestore.instance.collection('calls').doc(channelName).update({'status': 'ended'});
+              },
+            ),
+            TextButton(
+              child: const Text("Accept", style: TextStyle(color: accentColor)),
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+                // Navigate to VideoCallingScreen as receiver
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => VideoCallingScreen(
+                      loginUserId: currentLoginUserId,
+                      channelName: channelName,
+                      targetUserName: callerName, // Placeholder
+                      isCaller: false, // This user is the receiver
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    // Listen to the provider for state changes
+    // Start listening for incoming calls as soon as the screen is built
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _listenForIncomingCalls(context);
+    });
+
     final provider = Provider.of<UserListProvider>(context);
 
     return Scaffold(
       backgroundColor: clDeepBlue,
       appBar: AppBar(
+        leading: IconButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+            },
+            icon: const Icon(Icons.arrow_back, color: Colors.white)),
         title: const Text('Registered Users', style: TextStyle(color: Colors.white)),
         backgroundColor: clDeepBlue,
       ),
       body: FutureBuilder(
-        // Fetch users only if the list is empty AND we're not already loading.
-        // This logic ensures 'fetchRegisteredUsers' is called once on initial load.
         future: provider.registeredUsers.isEmpty && !provider.isLoading
             ? provider.fetchRegisteredUsers()
             : null,
         builder: (context, snapshot) {
-
-          // --- FIX: The guaranteed return of a sized widget in all states ---
-
-          // 1. Loading State
           if (provider.isLoading && provider.registeredUsers.isEmpty) {
             return const Center(
               child: CircularProgressIndicator(color: accentColor),
             );
           }
-
-          // 2. Error State
           if (provider.errorMessage != null) {
             return Center(
               child: Padding(
@@ -90,8 +159,6 @@ class RegisteredUsersScreen extends StatelessWidget {
               ),
             );
           }
-
-          // 3. Empty State (after loading or if data is truly empty)
           if (provider.registeredUsers.isEmpty) {
             return const Center(
               child: Text(
@@ -101,13 +168,23 @@ class RegisteredUsersScreen extends StatelessWidget {
             );
           }
 
-          // 4. Data Available State
-          // This ListView.builder will be properly sized by the Scaffold's body.
+          // Filter out the current logged-in user from the list
+          final displayUsers = provider.registeredUsers.where((user) => user.id != currentLoginUserId).toList();
+
+          if (displayUsers.isEmpty) {
+            return const Center(
+              child: Text(
+                'No other users found.',
+                style: TextStyle(color: clLightSkyGray, fontSize: 16),
+              ),
+            );
+          }
+
           return ListView.builder(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            itemCount: provider.registeredUsers.length,
+            itemCount: displayUsers.length,
             itemBuilder: (context, index) {
-              final AppUser user = provider.registeredUsers[index];
+              final AppUser user = displayUsers[index];
               return _buildUserListItem(context, user);
             },
           );
@@ -117,10 +194,6 @@ class RegisteredUsersScreen extends StatelessWidget {
   }
 
   Widget _buildUserListItem(BuildContext context, AppUser user) {
-    // This Padding widget is the one referred to in the error.
-    // Since its parent is the ListView.builder, which provides unbounded height
-    // constraints (but manages the scrolling and viewport), this widget itself
-    // will now be laid out correctly as a child of the list.
     return Padding(
       padding: const EdgeInsets.only(bottom: 10.0),
       child: DecoratedBox(
@@ -133,7 +206,7 @@ class RegisteredUsersScreen extends StatelessWidget {
           leading: Container(
             width: 40,
             height: 40,
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               color: accentColor,
               shape: BoxShape.circle,
             ),
@@ -162,4 +235,3 @@ class RegisteredUsersScreen extends StatelessWidget {
     );
   }
 }
-

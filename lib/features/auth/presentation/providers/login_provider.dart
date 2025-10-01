@@ -19,20 +19,21 @@ import 'package:shared_preferences/shared_preferences.dart';
     Map<String, dynamic>? _user;
     Map<String, dynamic>? get user => _user;
 
-    Future<bool> login(String email, String password) async {
+    Future<bool> login(String email, String password,BuildContext context) async {
       _isLoading = true;
       _errorMessage = null;
       notifyListeners();
-
+      print(email+' FKRKF '+password);
       try {
         final querySnapshot = await db
             .collection('USERS')
-            .where('email', isEqualTo: email)
-            .where('password', isEqualTo: password)
+            .where('email', isEqualTo: email.trim())
+            .where('password', isEqualTo: password.trim())
             .limit(1)
             .get();
 
         if (querySnapshot.docs.isNotEmpty) {
+          print(' IRRJF ');
           final doc = querySnapshot.docs.first;
           _user = doc.data(); // ✅ this is Map<String, dynamic>
 
@@ -52,10 +53,17 @@ import 'package:shared_preferences/shared_preferences.dart';
           await prefs.setString('phone', userPhone);
           await prefs.setString('fcmToken', fcmToken);
 
+            // Navigate to User List Screen or Video Call Screen
+            callNextReplacement(UsersListScreen(userID: userId,userName: userName,from: 'Login11',), context);
+
           _isLoading = false;
           notifyListeners();
           return true;
         } else {
+          print(' FIOR KFR ');
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(errorMessage ?? 'Login failed')),
+          );
           _errorMessage = "Invalid email or password";
         }
       } catch (e) {
@@ -159,7 +167,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(
-            builder: (context) => UsersListScreen(userID: id, userName: name,
+            builder: (context) => UsersListScreen(userID: id, userName: name,from: 'Login22',
 
             ),
           ),

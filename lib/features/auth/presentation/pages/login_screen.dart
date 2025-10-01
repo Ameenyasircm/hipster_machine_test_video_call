@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hipster_machine_test/core/utils/functions.dart';
 import 'package:hipster_machine_test/features/auth/presentation/pages/registration_screen.dart';
+import 'package:hipster_machine_test/features/auth/presentation/pages/users_list_screen.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/constants/colors.dart';
 import '../providers/login_provider.dart';
@@ -20,19 +21,12 @@ class _LoginScreenState extends State<LoginScreen> {
   void _submitLogin(BuildContext context) async {
     if (_formKey.currentState!.validate()) {
       final provider = Provider.of<LoginProvider>(context, listen: false);
-      bool success = await provider.login(
+    await provider.login(
         _emailController.text.trim(),
-        _passwordController.text.trim(),
+        _passwordController.text.trim(),context
       );
 
-      if (success) {
-        // Navigate to User List Screen or Video Call Screen
-        Navigator.pushReplacementNamed(context, '/users');
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(provider.errorMessage ?? 'Login failed')),
-        );
-      }
+
     }
   }
 

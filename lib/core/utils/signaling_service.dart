@@ -1,288 +1,378 @@
-// lib/core/utils/call_service.dart
-
+// lib/core/utils/signaling_service.dart
+import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
-// Note: You must ensure 'flutter_webrtc' is installed in your project.
-
-// Define a simple User model
-
-class AppUser {
-  final String id;
-  final String name;
-  final String phoneNumber; // <-- Added the new field
-  final String email;
-  final String fcmToken;
-
-  AppUser({
-    required this.id,
-    required this.name,
-    required this.phoneNumber,
-    required this.email,
-    required this.fcmToken,
-  });
-
-  // Factory constructor to create an AppUser from a Firestore document
-  factory AppUser.fromFirestore(String id, Map<String, dynamic> data) {
-    return AppUser(
-      id: id,
-      name: data['name'] ?? 'N/A',
-      phoneNumber: data['phoneNumber'] ?? 'N/A', // <-- Mapped the new field
-      email: data['email'] ?? 'N/A',
-      fcmToken: data['fcmToken'] ?? 'N/A',
-    );
-  }
-}
-
-// Define the function signatures for the callbacks
-// In '../../../../core/utils/call_service.dart'
-
-
-// Type definitions (use these if they are not in a separate file)
-// lib/core/utils/call_service.dart
-
-
-// lib/core/utils/call_service.dart
-
-
-typedef StreamCallback = void Function(MediaStream stream);
-typedef CallIdCallback = void Function(String callId);
-typedef CallStatusCallback = void Function(String status);
-typedef SimpleCallback = void Function();
-
 
 class SignalingService {
-  // Callbacks
-  final StreamCallback onRemoteStream;
-  final SimpleCallback onCallEnded;
-  final CallIdCallback onIncomingCall;
-  final CallStatusCallback onCallStatusChanged;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  RTCPeerConnection? _peerConnection;
+  MediaStream? _localStream;
+  final String currentUserId;
+  final String channelName;
+  final Function(MediaStream) onAddRemoteStream;
+  final Function() onCallEnded;
 
-  // State variables
-  MediaStream? localStream;
-  MediaStream? remoteStream;
-  RTCPeerConnection? peerConnection;
-  String? currentCallId;
-  String? targetUserId;
-
-  // Media constraints
-  final Map<String, dynamic> mediaConstraints = {
-    'audio': true,
-    'video': {
-      'facingMode': 'user',
-      'width': {'ideal': 1280},
-      'height': {'ideal': 720},
-    }
-  };
+  bool _isInitialized = false;
+  bool _isDisposed = false;
+  bool _offerCreated = false;
+  bool _answerCreated = false;
+  StreamSubscription? _callSubscription;
+  StreamSubscription? _candidateSubscription;
+  List<RTCIceCandidate> _pendingCandidates = []; // Queue for pending candidates
 
   SignalingService({
-    required this.onRemoteStream,
+    required this.currentUserId,
+    required this.channelName,
+    required this.onAddRemoteStream,
     required this.onCallEnded,
-    required this.onIncomingCall,
-    required this.onCallStatusChanged,
-  }) {
-    print('CALL SERVICE: SignalingService initialized');
+  });
+
+  RTCPeerConnection? get peerConnection => _peerConnection;
+  MediaStream? get localStream => _localStream;
+
+  String get _callerId {
+    final parts = channelName.split('_');
+    return parts.isNotEmpty ? parts[0] : '';
   }
 
-  /// Initialize local media stream (camera and microphone)
-  Future<void> initializeMedia() async {
-    try {
-      print('CALL SERVICE: Requesting media access...');
-      localStream = await navigator.mediaDevices.getUserMedia(mediaConstraints);
+  String get _receiverId {
+    final parts = channelName.split('_');
+    return parts.length > 1 ? parts[1] : '';
+  }
 
-      if (localStream != null) {
-        print('CALL SERVICE: Local media stream retrieved successfully.');
-        if (peerConnection != null) {
-          localStream!.getTracks().forEach((track) {
-            peerConnection!.addTrack(track, localStream!);
-            print('CALL SERVICE: Added track ${track.kind} to peer connection.');
-          });
-        }
+  bool get isCaller => currentUserId == _callerId;
+
+  Future<void> init() async {
+    if (_isInitialized) return;
+
+    try {
+      await _initializePeerConnection();
+      await _getUserMedia();
+      _setupPeerConnectionListeners();
+      await _listenForRemoteSignaling();
+
+      _isInitialized = true;
+      print('SignalingService initialized successfully - isCaller: $isCaller');
+
+      // Only create offer if we're the caller AND no offer exists yet
+      if (isCaller) {
+        _checkExistingCall();
+      }
+    } catch (e) {
+      print('Error initializing signaling service: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> _checkExistingCall() async {
+    if (!isCaller) return; // 🚫 Receivers must never create offers
+
+    try {
+      final doc = await _firestore.collection('calls').doc(channelName).get();
+      if (!doc.exists || !doc.data()!.containsKey('offer')) {
+        await createOffer();
       } else {
-        print('CALL SERVICE WARNING: Local stream is null after getUserMedia');
+        print('Existing call found, waiting for answer...');
       }
     } catch (e) {
-      print('CALL SERVICE ERROR: Failed to get user media: $e');
-      localStream = null;
-      rethrow;
+      print('Error checking existing call: $e');
     }
   }
 
-  /// Create WebRTC peer connection
-  Future<void> _createPeerConnection() async {
-    try {
-      final Map<String, dynamic> configuration = {
-        'iceServers': [
-          {'urls': 'stun:stun.l.google.com:19302'},
-        ],
-        'sdpSemantics': 'unified-plan',
-      };
+  Future<void> _initializePeerConnection() async {
+    _peerConnection = await createPeerConnection({
+      'iceServers': [
+        {'urls': 'stun:stun.l.google.com:19302'},
+        {'urls': 'stun:stun1.l.google.com:19302'},
+      ]
+    }, {
+      'optional': [
+        {'DtlsSrtpKeyAgreement': true},
+      ]
+    });
+    print('PeerConnection created');
+  }
 
-      peerConnection = await createPeerConnection(configuration);
+  Future<void> _getUserMedia() async {
+    _localStream = await navigator.mediaDevices.getUserMedia({
+      'video': {
+        'width': 640,
+        'height': 480,
+        'frameRate': 30,
+      },
+      'audio': true,
+    });
+    print('Local media stream obtained with ${_localStream!.getTracks().length} tracks');
+  }
 
-      // Add local stream tracks to peer connection
-      if (localStream != null) {
-        localStream!.getTracks().forEach((track) {
-          peerConnection!.addTrack(track, localStream!);
-        });
+  void _setupPeerConnectionListeners() {
+    // Add local tracks to peer connection
+    _localStream!.getTracks().forEach((track) {
+      _peerConnection!.addTrack(track, _localStream!);
+      print('Added local track: ${track.kind}');
+    });
+
+    // Handle incoming remote streams
+    _peerConnection!.onTrack = (RTCTrackEvent event) {
+      print('=== REMOTE TRACK RECEIVED ===');
+      print('Track kind: ${event.track?.kind}');
+      print('Track id: ${event.track?.id}');
+      print('Streams count: ${event.streams.length}');
+
+      if (event.streams.isNotEmpty) {
+        final remoteStream = event.streams[0];
+        print('Remote stream received with ID: ${remoteStream.id}');
+
+        // Notify UI about the remote stream
+        onAddRemoteStream(remoteStream);
       }
+    };
 
-      // Handle remote stream
-      peerConnection!.onTrack = (RTCTrackEvent event) {
-        print('CALL SERVICE: Remote track received');
-        if (event.streams.isNotEmpty) {
-          remoteStream = event.streams[0];
-          onRemoteStream(remoteStream!);
+    // Handle ICE candidates
+    _peerConnection!.onIceCandidate = (RTCIceCandidate? candidate) {
+      if (candidate == null) return;
+      print('ICE candidate generated: ${candidate.candidate}');
+      _sendIceCandidate(candidate);
+    };
+
+    // Handle connection state changes
+    _peerConnection!.onConnectionState = (RTCPeerConnectionState state) {
+      print('Connection state: $state');
+      if (state == RTCPeerConnectionState.RTCPeerConnectionStateConnected) {
+        print('=== PEER CONNECTION CONNECTED ===');
+      }
+    };
+
+    _peerConnection!.onIceGatheringState = (RTCIceGatheringState state) {
+      print('ICE gathering state: $state');
+    };
+
+    _peerConnection!.onSignalingState = (RTCSignalingState state) {
+      print('Signaling state: $state');
+    };
+  }
+
+  Future<void> _sendIceCandidate(RTCIceCandidate candidate) async {
+    final collectionName = isCaller ? 'callerCandidates' : 'receiverCandidates';
+    try {
+      await _firestore
+          .collection('calls')
+          .doc(channelName)
+          .collection(collectionName)
+          .add(candidate.toMap());
+      print('ICE candidate sent to $collectionName');
+    } catch (e) {
+      print('Error sending ICE candidate: $e');
+    }
+  }
+
+  Future<void> _listenForRemoteSignaling() async {
+    print('Listening for remote signaling...');
+
+    // Listen for call document changes (SDP exchange)
+    _callSubscription = _firestore
+        .collection('calls')
+        .doc(channelName)
+        .snapshots()
+        .listen((snapshot) async {
+      if (!snapshot.exists || _isDisposed) return;
+
+      final data = snapshot.data()!;
+      print('Call document updated: ${data.keys}');
+
+      await _handleRemoteSdp(data);
+      await _checkCallStatus(data);
+    });
+
+    // Listen for remote ICE candidates
+    final remoteCandidateCollection = isCaller ? 'receiverCandidates' : 'callerCandidates';
+    _candidateSubscription = _firestore
+        .collection('calls')
+        .doc(channelName)
+        .collection(remoteCandidateCollection)
+        .snapshots()
+        .listen((snapshot) {
+      for (final change in snapshot.docChanges) {
+        if (change.type == DocumentChangeType.added && !_isDisposed) {
+          print('Remote ICE candidate received');
+          _handleRemoteIceCandidate(change.doc);
         }
-      };
-
-      // Handle ICE candidates
-      peerConnection!.onIceCandidate = (RTCIceCandidate candidate) {
-        print('CALL SERVICE: ICE candidate generated: ${candidate.candidate}');
-      };
-
-      // Handle connection state changes
-      peerConnection!.onConnectionState = (RTCPeerConnectionState state) {
-        print('CALL SERVICE: Connection state: $state');
-        switch (state) {
-          case RTCPeerConnectionState.RTCPeerConnectionStateConnected:
-            onCallStatusChanged('active');
-            break;
-          case RTCPeerConnectionState.RTCPeerConnectionStateDisconnected:
-          case RTCPeerConnectionState.RTCPeerConnectionStateFailed:
-            onCallStatusChanged('ended');
-            onCallEnded();
-            break;
-          default:
-            break;
-        }
-      };
-
-      print('CALL SERVICE: Peer connection created successfully');
-    } catch (e) {
-      print('CALL SERVICE ERROR: Failed to create peer connection: $e');
-      rethrow;
-    }
+      }
+    });
   }
 
-  /// Create call and send offer to target user
-  Future<void> createCall(String targetId) async {
+  Future<void> _handleRemoteSdp(Map<String, dynamic> data) async {
     try {
-      targetUserId = targetId;
-      currentCallId = 'call_${DateTime.now().millisecondsSinceEpoch}';
-      print('CALL SERVICE: Creating call $currentCallId to $targetId');
-      onCallStatusChanged('calling');
+      // If we're the receiver and there's an offer AND we haven't created an answer yet
+      if (!isCaller && data.containsKey('offer') && !_answerCreated) {
+        print('Received offer as receiver - creating answer');
+        final offer = RTCSessionDescription(data['offer']['sdp'], data['offer']['type']);
 
-      if (localStream == null) await initializeMedia();
-      await _createPeerConnection();
+        // Set remote description first
+        await _peerConnection!.setRemoteDescription(offer);
+        print('Remote description set (offer)');
 
-      RTCSessionDescription offer = await peerConnection!.createOffer();
-      await peerConnection!.setLocalDescription(offer);
-      print('CALL SERVICE: Offer created and set as local description');
+        // Process any pending ICE candidates
+        await _processPendingCandidates();
 
-      // TODO: Send offer to target via signaling server
+        // Create answer
+        _answerCreated = true;
+        await createAnswer();
+      }
+
+      // If we're the caller and there's an answer
+      if (isCaller && data.containsKey('answer') && _offerCreated) {
+        print('Received answer as caller');
+        final answer = RTCSessionDescription(data['answer']['sdp'], data['answer']['type']);
+
+        await _peerConnection!.setRemoteDescription(answer);
+        print('Remote description set (answer)');
+
+        // Process any pending ICE candidates
+        await _processPendingCandidates();
+      }
     } catch (e) {
-      print('CALL SERVICE ERROR: Failed to create call: $e');
-      onCallStatusChanged('error');
-      rethrow;
+      print('Error handling remote SDP: $e');
     }
   }
-
-  /// Accept incoming call
-  Future<void> acceptCall() async {
+  Future<void> _handleRemoteIceCandidate(DocumentSnapshot doc) async {
     try {
-      print('CALL SERVICE: Accepting call $currentCallId');
-      onCallStatusChanged('connecting');
+      final data = doc.data() as Map<String, dynamic>;
+      final candidate = RTCIceCandidate(
+        data['candidate'],
+        data['sdpMid'] ?? '',
+        data['sdpMLineIndex'] ?? 0,
+      );
 
-      if (localStream == null) await initializeMedia();
-      await _createPeerConnection();
+      // Try to add candidate immediately
+      try {
+        await _peerConnection!.addCandidate(candidate);
+        print('Remote ICE candidate added to peer connection');
+      } catch (e) {
+        // If adding fails, queue the candidate for later
+        print('Failed to add ICE candidate, queuing for later: $e');
+        _pendingCandidates.add(candidate);
+      }
 
-      // TODO: Receive offer from caller, setRemoteDescription, create answer, send back
-      print('CALL SERVICE: Call accepted, waiting for connection...');
+      // Remove candidate from Firestore after processing
+      await doc.reference.delete();
     } catch (e) {
-      print('CALL SERVICE ERROR: Failed to accept call: $e');
-      onCallStatusChanged('error');
+      print('Error handling remote ICE candidate: $e');
+      await doc.reference.delete();
+    }
+  }
+
+  Future<void> _processPendingCandidates() async {
+    if (_pendingCandidates.isEmpty) return;
+
+    print('Processing ${_pendingCandidates.length} pending ICE candidates');
+    for (final candidate in _pendingCandidates) {
+      try {
+        await _peerConnection!.addCandidate(candidate);
+        print('Pending ICE candidate added to peer connection');
+      } catch (e) {
+        print('Failed to add pending ICE candidate: $e');
+      }
+    }
+    _pendingCandidates.clear();
+  }
+
+  Future<void> _checkCallStatus(Map<String, dynamic> data) async {
+    if (data['status'] == 'ended') {
+      print('Call ended remotely');
+      onCallEnded();
+    }
+  }
+
+  Future<void> createOffer() async {
+    if (_offerCreated) {
+      print('Offer already created, skipping...');
+      return;
+    }
+
+    try {
+      print('Creating offer...');
+      final offer = await _peerConnection!.createOffer();
+      await _peerConnection!.setLocalDescription(offer);
+      print('Local description set (offer)');
+
+      await _firestore.collection('calls').doc(channelName).set({
+        'offer': offer.toMap(),
+        'callerId': _callerId,
+        'receiverId': _receiverId,
+        'status': 'ringing',
+        'channelName': channelName,
+        'createdAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      _offerCreated = true;
+      print('Offer saved to Firestore');
+    } catch (e) {
+      print('Error creating offer: $e');
       rethrow;
     }
   }
 
-  /// End current call
-  void endCall() {
-    print('CALL SERVICE: Ending call $currentCallId');
-    _cleanup();
-    onCallStatusChanged('ended');
-    onCallEnded();
-    currentCallId = null;
-    targetUserId = null;
-  }
+  Future<void> createAnswer() async {
+    if (_answerCreated) {
+      print('Answer already created, skipping...');
+      return;
+    }
 
-  /// Reject incoming call
-  void rejectCall() {
-    print('CALL SERVICE: Rejecting call $currentCallId');
-    _cleanup();
-    onCallStatusChanged('rejected');
-    currentCallId = null;
-    targetUserId = null;
-  }
+    try {
+      print('Creating answer...');
+      final answer = await _peerConnection!.createAnswer();
+      await _peerConnection!.setLocalDescription(answer);
+      print('Local description set (answer)');
 
-  /// Listen for incoming calls
-  void listenForIncomingCalls(String userId) {
-    print('CALL SERVICE: Listening for incoming calls for user $userId');
-    // TODO: Connect to signaling server and call onIncomingCall(callId)
-  }
+      await _firestore.collection('calls').doc(channelName).update({
+        'answer': answer.toMap(),
+        'status': 'accepted',
+        'answeredAt': FieldValue.serverTimestamp(),
+      });
 
-  /// Toggle microphone mute
-  void toggleMute() {
-    if (localStream != null) {
-      final audioTracks = localStream!.getAudioTracks();
-      if (audioTracks.isNotEmpty) {
-        bool enabled = audioTracks[0].enabled;
-        audioTracks[0].enabled = !enabled;
-        print('CALL SERVICE: Audio ${!enabled ? "muted" : "unmuted"}');
-      }
+      _answerCreated = true;
+      print('Answer saved to Firestore');
+    } catch (e) {
+      print('Error creating answer: $e');
+      rethrow;
     }
   }
+  Future<void> hangUp() async {
+    _isDisposed = true;
 
-  /// Toggle camera on/off
-  void toggleCamera() {
-    if (localStream != null) {
-      final videoTracks = localStream!.getVideoTracks();
-      if (videoTracks.isNotEmpty) {
-        bool enabled = videoTracks[0].enabled;
-        videoTracks[0].enabled = !enabled;
-        print('CALL SERVICE: Video ${!enabled ? "disabled" : "enabled"}');
-      }
+    try {
+      await _firestore.collection('calls').doc(channelName).update({
+        'status': 'ended',
+        'endedAt': FieldValue.serverTimestamp(),
+      });
+      print('Call ended in Firestore');
+    } catch (e) {
+      print('Error updating call status: $e');
     }
+
+    await _cleanup();
   }
 
-  /// Switch between front and back camera
-  Future<void> switchCamera() async {
-    if (localStream != null) {
-      final videoTracks = localStream!.getVideoTracks();
-      if (videoTracks.isNotEmpty) {
-        await Helper.switchCamera(videoTracks[0]);
-        print('CALL SERVICE: Camera switched');
-      }
-    }
+  Future<void> _cleanup() async {
+    await _callSubscription?.cancel();
+    await _candidateSubscription?.cancel();
+
+    await _localStream?.dispose();
+    _localStream = null;
+
+    await _peerConnection?.close();
+    _peerConnection = null;
+
+    _isInitialized = false;
+    _offerCreated = false;
+    _answerCreated = false;
+    _pendingCandidates.clear();
+    print('SignalingService cleaned up');
   }
 
-  /// Clean up peer connection and streams
-  void _cleanup() {
-    peerConnection?.close();
-    peerConnection = null;
-    remoteStream = null;
-  }
-
-  /// Dispose everything permanently
   void dispose() {
-    print('CALL SERVICE: Disposing SignalingService');
+    _isDisposed = true;
     _cleanup();
-
-    localStream?.getTracks().forEach((track) => track.stop());
-    localStream?.dispose();
-    localStream = null;
-
-    remoteStream?.dispose();
-    remoteStream = null;
-
-    print('CALL SERVICE: SignalingService disposed');
   }
 }

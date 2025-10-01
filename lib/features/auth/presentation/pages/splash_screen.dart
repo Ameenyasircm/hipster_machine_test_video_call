@@ -38,9 +38,9 @@ class _SplashScreenState extends State<SplashScreen> {
     final isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
     final userID = prefs.getString('userId').toString();
     final userName   = prefs.getString('name').toString();
-
+    print(userID+' FRKJ RF '+userName);
     if (isLoggedIn) {
-      callNextReplacement( UsersListScreen(userName:userID ,userID: userName,), context);
+      callNextReplacement( UsersListScreen(userName:userID ,userID: userName,from: 'splashSCreen',), context);
     } else {
       callNextReplacement(const LoginScreen(), context);
     }
