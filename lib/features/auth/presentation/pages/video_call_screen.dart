@@ -33,6 +33,11 @@ class _VideoCallingScreenState extends State<VideoCallingScreen> {
   bool _isConnecting = false;
   bool _remoteDescriptionSet = false;
 
+  // Control states
+  bool _isMuted = false;
+  bool _isVideoEnabled = true;
+  bool _isFrontCamera = true;
+
   final List<RTCIceCandidate> _remoteCandidatesQueue = [];
   StreamSubscription? _offerSubscription;
   StreamSubscription? _answerSubscription;
@@ -489,6 +494,47 @@ class _VideoCallingScreenState extends State<VideoCallingScreen> {
   }
 
   // ============================================
+  // MEDIA CONTROLS
+  // ============================================
+
+  Future<void> _toggleMute() async {
+    if (_localStream == null) return;
+
+    setState(() {
+      _isMuted = !_isMuted;
+    });
+
+    _localStream!.getAudioTracks().forEach((track) {
+      track.enabled = !_isMuted;
+    });
+  }
+
+  Future<void> _toggleVideo() async {
+    if (_localStream == null) return;
+
+    setState(() {
+      _isVideoEnabled = !_isVideoEnabled;
+    });
+
+    _localStream!.getVideoTracks().forEach((track) {
+      track.enabled = _isVideoEnabled;
+    });
+  }
+
+  Future<void> _switchCamera() async {
+    if (_localStream == null) return;
+
+    setState(() {
+      _isFrontCamera = !_isFrontCamera;
+    });
+
+    final videoTrack = _localStream!.getVideoTracks().firstOrNull;
+    if (videoTrack != null) {
+      await Helper.switchCamera(videoTrack);
+    }
+  }
+
+  // ============================================
   // UI
   // ============================================
 
@@ -586,8 +632,16 @@ class _VideoCallingScreenState extends State<VideoCallingScreen> {
               left: 0,
               right: 0,
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
+                  // Mute/Unmute button
+                  _buildControlButton(
+                    icon: _isMuted ? Icons.mic_off : Icons.mic,
+                    onTap: _toggleMute,
+                    backgroundColor: _isMuted ? Colors.white : Colors.white24,
+                    iconColor: _isMuted ? Colors.red : Colors.white,
+                  ),
+
                   // End call button
                   GestureDetector(
                     onTap: _endCall,
@@ -601,11 +655,52 @@ class _VideoCallingScreenState extends State<VideoCallingScreen> {
                       child: Icon(Icons.call_end, color: Colors.white, size: 35),
                     ),
                   ),
+
+                  // Camera on/off button
+                  _buildControlButton(
+                    icon: _isVideoEnabled ? Icons.videocam : Icons.videocam_off,
+                    onTap: _toggleVideo,
+                    backgroundColor: _isVideoEnabled ? Colors.white24 : Colors.white,
+                    iconColor: _isVideoEnabled ? Colors.white : Colors.red,
+                  ),
                 ],
               ),
             ),
+
+            // Camera flip button
+            if (_isVideoEnabled)
+              Positioned(
+                bottom: 140,
+                right: 30,
+                child: _buildControlButton(
+                  icon: Icons.flip_camera_ios,
+                  onTap: _switchCamera,
+                  backgroundColor: Colors.white24,
+                  iconColor: Colors.white,
+                ),
+              ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildControlButton({
+    required IconData icon,
+    required VoidCallback onTap,
+    required Color backgroundColor,
+    required Color iconColor,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 56,
+        height: 56,
+        decoration: BoxDecoration(
+          color: backgroundColor,
+          shape: BoxShape.circle,
+        ),
+        child: Icon(icon, color: iconColor, size: 28),
       ),
     );
   }
