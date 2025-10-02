@@ -43,3 +43,13 @@ Splash screen & app icon.
 Android permissions (Camera, Microphone, Internet).
 
 Versioning & signing (debug keys).
+
+
+ Logins samople :
+
+ email : aa@gmail.com
+ password : 123456
+
+email : ameen@gmail.com
+ password : 123456
+
